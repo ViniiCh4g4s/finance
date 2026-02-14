@@ -8,26 +8,24 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@/components/ui/combobox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
-export interface DespesaFormData {
+export interface GanhoFormData {
     descricao: string;
-    categoria: string;
-    valor: string;
+    fonte: string;
     data: string;
-    forma: string;
+    valor: string;
 }
 
 interface Props {
     open: boolean;
     onClose: () => void;
-    onSubmit: (data: DespesaFormData) => void;
-    initialData?: DespesaFormData;
+    onSubmit: (data: GanhoFormData) => void;
+    initialData?: GanhoFormData;
     onDelete?: () => void;
 }
 
-const CATEGORIAS = ["Casa", "Assinaturas", "Transporte", "Farmácia e Saúde", "Mercado", "Alimentação", "Entretenimento", "Shopping", "Utilidades", "Outros"];
-const FORMAS = ["Pix", "Boleto", "Dinheiro", "Cartão de Débito", "Cartão de Crédito Itaú", "Cartão de Crédito Nubank", "Cartão de Crédito Nubank PJ"];
+const FONTES = ["Trabalho", "Investimentos", "Manutenções", "Freelance", "Outros"];
 
-const empty: DespesaFormData = { descricao: "", categoria: "", valor: "", data: "", forma: "" };
+const empty: GanhoFormData = { descricao: "", fonte: "", data: "", valor: "" };
 
 const inputCls = "w-full h-9 px-3 rounded-md border border-zinc-200 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-950/10 focus:border-zinc-400 bg-white";
 
@@ -38,9 +36,9 @@ const toDate = (s: string): Date | undefined => {
 };
 const toStr = (d: Date | undefined): string => d ? format(d, "dd/MM/yyyy") : "";
 
-export default function DespesaVariavelModal({ open, onClose, onSubmit, initialData, onDelete }: Props) {
-    const [form, setForm] = useState<DespesaFormData>(empty);
-    const sf = (k: keyof DespesaFormData, v: string) => setForm(p => ({ ...p, [k]: v }));
+export default function GanhoModal({ open, onClose, onSubmit, initialData, onDelete }: Props) {
+    const [form, setForm] = useState<GanhoFormData>(empty);
+    const sf = (k: keyof GanhoFormData, v: string) => setForm(p => ({ ...p, [k]: v }));
     const editing = !!initialData;
     const [popData, setPopData] = useState(false);
 
@@ -63,7 +61,7 @@ export default function DespesaVariavelModal({ open, onClose, onSubmit, initialD
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={handleClose} />
             <div className="relative bg-white rounded-xl shadow-2xl border border-zinc-200 w-full max-w-lg mx-4" style={{ animation: "si .2s ease" }}>
                 <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
-                    <h3 className="text-base font-semibold text-zinc-900">{editing ? "Editar Despesa Variável" : "Nova Despesa Variável"}</h3>
+                    <h3 className="text-base font-semibold text-zinc-900">{editing ? "Editar Ganho" : "Novo Ganho"}</h3>
                     <button onClick={handleClose} className="p-1.5 rounded-md hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition-colors">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
                     </button>
@@ -71,12 +69,12 @@ export default function DespesaVariavelModal({ open, onClose, onSubmit, initialD
                 <div className="px-6 py-5 space-y-4">
                     <div className="space-y-1.5">
                         <label className="block text-sm font-medium text-zinc-700">Descrição</label>
-                        <input placeholder="Ex: Uber, Farmácia..." value={form.descricao} onChange={e => sf("descricao", e.target.value)} className={inputCls} />
+                        <input placeholder="Ex: Salário, Freelance..." value={form.descricao} onChange={e => sf("descricao", e.target.value)} className={inputCls} />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1.5">
-                            <label className="block text-sm font-medium text-zinc-700">Categoria</label>
-                            <Combobox items={CATEGORIAS} value={form.categoria || null} onValueChange={val => sf("categoria", val ?? "")}>
+                            <label className="block text-sm font-medium text-zinc-700">Fonte de Renda</label>
+                            <Combobox items={FONTES} value={form.fonte || null} onValueChange={val => sf("fonte", val ?? "")}>
                                 <ComboboxInput placeholder="Selecione..." className="w-full" />
                                 <ComboboxContent>
                                     <ComboboxEmpty>Nenhum item encontrado.</ComboboxEmpty>
@@ -91,40 +89,26 @@ export default function DespesaVariavelModal({ open, onClose, onSubmit, initialD
                             <input type="number" step="0.01" placeholder="0,00" value={form.valor} onChange={e => sf("valor", e.target.value)} className={inputCls} />
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                            <label className="block text-sm font-medium text-zinc-700">Data</label>
-                            <Popover open={popData} onOpenChange={setPopData}>
-                                <PopoverTrigger asChild>
-                                    <Button variant="outline" data-empty={!form.data} className="w-full h-9 justify-between text-left font-normal text-sm data-[empty=true]:text-muted-foreground">
-                                        {form.data || <span>dd/mm/aaaa</span>}
-                                        <ChevronDownIcon className="size-4 opacity-50" />
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar
-                                        mode="single"
-                                        selected={toDate(form.data)}
-                                        onSelect={d => { sf("data", toStr(d)); setPopData(false); }}
-                                        defaultMonth={toDate(form.data)}
-                                        locale={ptBR}
-                                        captionLayout="dropdown"
-                                    />
-                                </PopoverContent>
-                            </Popover>
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="block text-sm font-medium text-zinc-700">Forma de Pagamento</label>
-                            <Combobox items={FORMAS} value={form.forma || null} onValueChange={val => sf("forma", val ?? "")}>
-                                <ComboboxInput placeholder="Selecione..." className="w-full" />
-                                <ComboboxContent>
-                                    <ComboboxEmpty>Nenhum item encontrado.</ComboboxEmpty>
-                                    <ComboboxList>
-                                        {item => <ComboboxItem key={item} value={item}>{item}</ComboboxItem>}
-                                    </ComboboxList>
-                                </ComboboxContent>
-                            </Combobox>
-                        </div>
+                    <div className="space-y-1.5">
+                        <label className="block text-sm font-medium text-zinc-700">Data</label>
+                        <Popover open={popData} onOpenChange={setPopData}>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" data-empty={!form.data} className="w-full h-9 justify-between text-left font-normal text-sm data-[empty=true]:text-muted-foreground">
+                                    {form.data || <span>dd/mm/aaaa</span>}
+                                    <ChevronDownIcon className="size-4 opacity-50" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                    mode="single"
+                                    selected={toDate(form.data)}
+                                    onSelect={d => { sf("data", toStr(d)); setPopData(false); }}
+                                    defaultMonth={toDate(form.data)}
+                                    locale={ptBR}
+                                    captionLayout="dropdown"
+                                />
+                            </PopoverContent>
+                        </Popover>
                     </div>
                     <div className={`pt-1 flex gap-3 ${editing ? "" : "flex-col"}`}>
                         {editing && onDelete && (
@@ -147,7 +131,7 @@ export default function DespesaVariavelModal({ open, onClose, onSubmit, initialD
                             </AlertDialog>
                         )}
                         <button onClick={handleSubmit} className="flex-1 h-10 rounded-md bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800 active:bg-zinc-700 transition-colors">
-                            {editing ? "Salvar" : "Adicionar Despesa"}
+                            {editing ? "Salvar" : "Adicionar Ganho"}
                         </button>
                     </div>
                 </div>
