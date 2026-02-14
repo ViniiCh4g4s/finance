@@ -1,7 +1,12 @@
 import { type ReactNode, useState } from "react";
 import { Link, usePage } from "@inertiajs/react";
 import { logout } from "@/routes";
+import { Gem, TrendingUp, Home, Briefcase, BarChart3, Wrench, GraduationCap, CreditCard, ShoppingCart, HeartPulse, Car, Hammer, Gamepad2, TrendingDown, UtensilsCrossed, ShoppingBag, Banknote, FileText, Zap } from "lucide-react";
 import DespesaVariavelModal, { type DespesaFormData } from "@/components/despesa-variavel-modal";
+import GanhoModal, { type GanhoFormData } from "@/components/ganho-modal";
+import DespesaFixaModal, { type DespesaFixaFormData } from "@/components/despesa-fixa-modal";
+import DividaModal, { type DividaFormData } from "@/components/divida-modal";
+import InvestimentoModal, { type InvestimentoFormData } from "@/components/investimento-modal";
 
 /* ── TYPES ─────────────────────────────────────────────────────────────────── */
 
@@ -11,10 +16,10 @@ interface DespesaFixa { id: number; descricao: string; categoria: string; valor:
 interface DespesaVariavel { id: number; descricao: string; categoria: string; valor: number; data: string; balanco: string; forma: string }
 interface Divida { id: number; descricao: string; destino: string; valor: number; vencimento: string; status: string; balanco: string }
 interface Investimento { id: number; produto: string; empresa: string; valor: number; quantidade: number; valorTotal: number; tipoAtivo: string; provento: number; frequencia: string; balanco: string }
-interface Meta { id: number; nome: string; icon: string; percent: number; valor: number; investido: number; faltante: number }
-interface FonteRenda { nome: string; icon: string; percent: number; metaAnual: number; receitaAnual: number }
-interface Categoria { nome: string; icon: string; pct: number; lim: number | null; desp: number }
-interface FormaPagamento { nome: string; icon: string; pct: number; lim: number; desp: number }
+interface Meta { id: number; nome: string; icon: ReactNode; percent: number; valor: number; investido: number; faltante: number }
+interface FonteRenda { nome: string; icon: ReactNode; percent: number; metaAnual: number; receitaAnual: number }
+interface Categoria { nome: string; icon: ReactNode; pct: number; lim: number | null; desp: number }
+interface FormaPagamento { nome: string; icon: ReactNode; pct: number; lim: number; desp: number }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface Column<T = any> {
@@ -77,29 +82,29 @@ const dataInvest: Investimento[] = [
     {id:2,produto:"KNRI11",empresa:"Kinea Renda Im.",valor:146.36,quantidade:1,valorTotal:146.36,tipoAtivo:"Fundo Imobiliário",provento:1,frequencia:"Mensal",balanco:"Janeiro"},
 ];
 const dataMetas: Meta[] = [
-    {id:1,nome:"Casamento",icon:"💍",percent:17,valor:15000,investido:2541.04,faltante:12458.96},
-    {id:2,nome:"Investimentos",icon:"📈",percent:40,valor:3000,investido:1196.45,faltante:1803.55},
-    {id:3,nome:"Imóvel",icon:"🏠",percent:68,valor:9500,investido:6497.52,faltante:3002.48},
+    {id:1,nome:"Casamento",icon:<Gem className="size-5 text-zinc-700"/>,percent:17,valor:15000,investido:2541.04,faltante:12458.96},
+    {id:2,nome:"Investimentos",icon:<TrendingUp className="size-5 text-zinc-700"/>,percent:40,valor:3000,investido:1196.45,faltante:1803.55},
+    {id:3,nome:"Imóvel",icon:<Home className="size-5 text-zinc-700"/>,percent:68,valor:9500,investido:6497.52,faltante:3002.48},
 ];
 const dataFontes: FonteRenda[] = [
-    {nome:"Trabalho",icon:"💼",percent:87,metaAnual:42000,receitaAnual:36521.94},
-    {nome:"Investimentos",icon:"📊",percent:62,metaAnual:5000,receitaAnual:3100},
-    {nome:"Manutenções",icon:"🔧",percent:71,metaAnual:5000,receitaAnual:3535},
+    {nome:"Trabalho",icon:<Briefcase className="size-5 text-zinc-700"/>,percent:87,metaAnual:42000,receitaAnual:36521.94},
+    {nome:"Investimentos",icon:<BarChart3 className="size-5 text-zinc-700"/>,percent:62,metaAnual:5000,receitaAnual:3100},
+    {nome:"Manutenções",icon:<Wrench className="size-5 text-zinc-700"/>,percent:71,metaAnual:5000,receitaAnual:3535},
 ];
 const dataCategs: Categoria[] = [
-    {nome:"Casa",icon:"🏠",pct:43,lim:10000,desp:4295.42},{nome:"Profissional",icon:"💼",pct:110,lim:1000,desp:1101.48},
-    {nome:"Educação",icon:"🎓",pct:25,lim:1000,desp:253.5},{nome:"Assinaturas",icon:"💳",pct:136,lim:1000,desp:1358.95},
-    {nome:"Mercado",icon:"🛒",pct:14,lim:1500,desp:209.91},{nome:"Farmácia e Saúde",icon:"⚕️",pct:272,lim:200,desp:544.86},
-    {nome:"Transporte",icon:"🚗",pct:0,lim:null,desp:516.37},{nome:"Utilidades",icon:"🔨",pct:0,lim:null,desp:2350.48},
-    {nome:"Entretenimento",icon:"🎮",pct:0,lim:null,desp:2186.25},{nome:"Juros e Taxas",icon:"📉",pct:0,lim:null,desp:1001.23},
-    {nome:"Alimentação",icon:"🍽️",pct:0,lim:null,desp:1482.23},{nome:"Shopping",icon:"🛍️",pct:0,lim:null,desp:1486.45},
+    {nome:"Casa",icon:<Home className="size-4 text-zinc-600"/>,pct:43,lim:10000,desp:4295.42},{nome:"Profissional",icon:<Briefcase className="size-4 text-zinc-600"/>,pct:110,lim:1000,desp:1101.48},
+    {nome:"Educação",icon:<GraduationCap className="size-4 text-zinc-600"/>,pct:25,lim:1000,desp:253.5},{nome:"Assinaturas",icon:<CreditCard className="size-4 text-zinc-600"/>,pct:136,lim:1000,desp:1358.95},
+    {nome:"Mercado",icon:<ShoppingCart className="size-4 text-zinc-600"/>,pct:14,lim:1500,desp:209.91},{nome:"Farmácia e Saúde",icon:<HeartPulse className="size-4 text-zinc-600"/>,pct:272,lim:200,desp:544.86},
+    {nome:"Transporte",icon:<Car className="size-4 text-zinc-600"/>,pct:0,lim:null,desp:516.37},{nome:"Utilidades",icon:<Hammer className="size-4 text-zinc-600"/>,pct:0,lim:null,desp:2350.48},
+    {nome:"Entretenimento",icon:<Gamepad2 className="size-4 text-zinc-600"/>,pct:0,lim:null,desp:2186.25},{nome:"Juros e Taxas",icon:<TrendingDown className="size-4 text-zinc-600"/>,pct:0,lim:null,desp:1001.23},
+    {nome:"Alimentação",icon:<UtensilsCrossed className="size-4 text-zinc-600"/>,pct:0,lim:null,desp:1482.23},{nome:"Shopping",icon:<ShoppingBag className="size-4 text-zinc-600"/>,pct:0,lim:null,desp:1486.45},
 ];
 const dataFormas: FormaPagamento[] = [
-    {nome:"Dinheiro",icon:"💵",pct:70,lim:1000,desp:700},{nome:"Boleto",icon:"📄",pct:32,lim:4000,desp:1263.31},
-    {nome:"Pix",icon:"⚡",pct:28,lim:7000,desp:1985.23},{nome:"Cartão de Débito",icon:"💳",pct:33,lim:1500,desp:499.56},
-    {nome:"Cartão de Crédito Itaú",icon:"💳",pct:167,lim:5000,desp:8345.92},
-    {nome:"Cartão de Crédito Nubank",icon:"💳",pct:65,lim:2000,desp:1294.68},
-    {nome:"Cartão de Crédito Nubank PJ",icon:"💳",pct:96,lim:3000,desp:2878.22},
+    {nome:"Dinheiro",icon:<Banknote className="size-4 text-zinc-600"/>,pct:70,lim:1000,desp:700},{nome:"Boleto",icon:<FileText className="size-4 text-zinc-600"/>,pct:32,lim:4000,desp:1263.31},
+    {nome:"Pix",icon:<Zap className="size-4 text-zinc-600"/>,pct:28,lim:7000,desp:1985.23},{nome:"Cartão de Débito",icon:<CreditCard className="size-4 text-zinc-600"/>,pct:33,lim:1500,desp:499.56},
+    {nome:"Cartão de Crédito Itaú",icon:<CreditCard className="size-4 text-zinc-600"/>,pct:167,lim:5000,desp:8345.92},
+    {nome:"Cartão de Crédito Nubank",icon:<CreditCard className="size-4 text-zinc-600"/>,pct:65,lim:2000,desp:1294.68},
+    {nome:"Cartão de Crédito Nubank PJ",icon:<CreditCard className="size-4 text-zinc-600"/>,pct:96,lim:3000,desp:2878.22},
 ];
 
 /* ── UI ───────────────────────────────────────────────────────────────────── */
@@ -135,7 +140,8 @@ const Tabs = ({tabs,active,onChange}: {tabs: readonly string[]; active: string; 
 );
 const MT = ({a,o}: {a: string; o: (tab: string) => void}) => <Tabs tabs={MONTHS} active={a} onChange={o}/>;
 
-const Tbl = ({cols,data,footer}: {cols: Column[]; data: Record<string, any>[]; footer?: FooterItem[]}) => (
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const Tbl = ({cols,data,footer,onRowClick}: {cols: Column[]; data: Record<string, any>[]; footer?: FooterItem[]; onRowClick?: (row: Record<string, any>) => void}) => (
     <div className="rounded-xl border border-zinc-200 overflow-hidden bg-white shadow-sm">
         <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -144,7 +150,7 @@ const Tbl = ({cols,data,footer}: {cols: Column[]; data: Record<string, any>[]; f
                 </tr></thead>
                 <tbody className="divide-y divide-zinc-50">
                 {data.length===0?<tr><td colSpan={cols.length} className="px-4 py-10 text-center text-sm text-zinc-400">Nenhum registro neste mês</td></tr>
-                    :data.map((row,i)=><tr key={row.id||i} className="hover:bg-zinc-50/60 transition-colors">
+                    :data.map((row,i)=><tr key={row.id||i} onClick={()=>onRowClick?.(row)} className={`hover:bg-zinc-50/60 transition-colors ${onRowClick?"cursor-pointer":""}`}>
                         {cols.map(c=><td key={c.key} className={`px-4 py-3 ${c.align==="right"?"text-right":""}`}>{c.render?c.render(row):row[c.key]}</td>)}
                     </tr>)}
                 </tbody>
@@ -173,7 +179,11 @@ const yearOptions = Array.from({length: 5}, (_, i) => currentYear - 2 + i);
 export default function FinancasDashboard() {
     const { auth } = usePage().props;
     const [ano, setAno] = useState(currentYear);
+    const [ganhos, setGanhos] = useState(dataGanhos);
+    const [fixas, setFixas] = useState(dataFixas);
     const [variaveis, setVariaveis] = useState(initVar);
+    const [dividas, setDividas] = useState(dataDividas);
+    const [investimentos, setInvestimentos] = useState(dataInvest);
     const [qTab, setQTab] = useState("1º Quadrimestre");
     const [gM,setGM]=useState("Jan");
     const [fM,setFM]=useState("Jan");
@@ -181,19 +191,84 @@ export default function FinancasDashboard() {
     const [dM,setDM]=useState("Jan");
     const [iM,setIM]=useState("Jan");
     const [modal,setModal]=useState(false);
+    const [modalGanho,setModalGanho]=useState(false);
+    const [modalFixa,setModalFixa]=useState(false);
+    const [modalDivida,setModalDivida]=useState(false);
+    const [modalInvest,setModalInvest]=useState(false);
+    const [editingDV,setEditingDV]=useState<DespesaVariavel|null>(null);
+    const [editingGanho,setEditingGanho]=useState<Ganho|null>(null);
+    const [editingFixa,setEditingFixa]=useState<DespesaFixa|null>(null);
+    const [editingDivida,setEditingDivida]=useState<Divida|null>(null);
+    const [editingInvest,setEditingInvest]=useState<Investimento|null>(null);
 
-    const addDV=(data: DespesaFormData)=>{
-        setVariaveis(p=>[...p,{id:nid++,descricao:data.descricao,categoria:data.categoria,valor:parseFloat(data.valor),data:data.data,balanco:toFull(vM),forma:data.forma}]);
-        setModal(false);
+    const closeAll=()=>{setModal(false);setModalGanho(false);setModalFixa(false);setModalDivida(false);setModalInvest(false);setEditingDV(null);setEditingGanho(null);setEditingFixa(null);setEditingDivida(null);setEditingInvest(null);};
+
+    const submitDV=(data: DespesaFormData)=>{
+        if(editingDV){
+            setVariaveis(p=>p.map(r=>r.id===editingDV.id?{...r,descricao:data.descricao,categoria:data.categoria,valor:parseFloat(data.valor),data:data.data,forma:data.forma}:r));
+        } else {
+            setVariaveis(p=>[...p,{id:nid++,descricao:data.descricao,categoria:data.categoria,valor:parseFloat(data.valor),data:data.data,balanco:toFull(vM),forma:data.forma}]);
+        }
+        closeAll();
     };
+    const submitGanho=(data: GanhoFormData)=>{
+        if(editingGanho){
+            setGanhos(p=>p.map(r=>r.id===editingGanho.id?{...r,descricao:data.descricao,fonte:data.fonte,data:data.data,valor:parseFloat(data.valor)}:r));
+        } else {
+            setGanhos(p=>[...p,{id:nid++,descricao:data.descricao,fonte:data.fonte,data:data.data,valor:parseFloat(data.valor),balanco:toFull(gM)}]);
+        }
+        closeAll();
+    };
+    const submitFixa=(data: DespesaFixaFormData)=>{
+        if(editingFixa){
+            setFixas(p=>p.map(r=>r.id===editingFixa.id?{...r,descricao:data.descricao,categoria:data.categoria,valor:parseFloat(data.valor),vencimento:data.vencimento,status:data.status,dataPgto:data.dataPgto,forma:data.forma}:r));
+        } else {
+            setFixas(p=>[...p,{id:nid++,descricao:data.descricao,categoria:data.categoria,valor:parseFloat(data.valor),vencimento:data.vencimento,status:data.status,dataPgto:data.dataPgto,forma:data.forma,balanco:toFull(fM)}]);
+        }
+        closeAll();
+    };
+    const submitDivida=(data: DividaFormData)=>{
+        if(editingDivida){
+            setDividas(p=>p.map(r=>r.id===editingDivida.id?{...r,descricao:data.descricao,destino:data.destino,valor:parseFloat(data.valor),vencimento:data.vencimento,status:data.status}:r));
+        } else {
+            setDividas(p=>[...p,{id:nid++,descricao:data.descricao,destino:data.destino,valor:parseFloat(data.valor),vencimento:data.vencimento,status:data.status,balanco:toFull(dM)}]);
+        }
+        closeAll();
+    };
+    const submitInvest=(data: InvestimentoFormData)=>{
+        const val=parseFloat(data.valor),qty=parseInt(data.quantidade);
+        if(editingInvest){
+            setInvestimentos(p=>p.map(r=>r.id===editingInvest.id?{...r,produto:data.produto,empresa:data.empresa,valor:val,quantidade:qty,valorTotal:val*qty,tipoAtivo:data.tipoAtivo,provento:parseFloat(data.provento||"0"),frequencia:data.frequencia}:r));
+        } else {
+            setInvestimentos(p=>[...p,{id:nid++,produto:data.produto,empresa:data.empresa,valor:val,quantidade:qty,valorTotal:val*qty,tipoAtivo:data.tipoAtivo,provento:parseFloat(data.provento||"0"),frequencia:data.frequencia,balanco:toFull(iM)}]);
+        }
+        closeAll();
+    };
+
+    const deleteDV=()=>{if(editingDV){setVariaveis(p=>p.filter(r=>r.id!==editingDV.id));closeAll();}};
+    const deleteGanho=()=>{if(editingGanho){setGanhos(p=>p.filter(r=>r.id!==editingGanho.id));closeAll();}};
+    const deleteFixa=()=>{if(editingFixa){setFixas(p=>p.filter(r=>r.id!==editingFixa.id));closeAll();}};
+    const deleteDivida=()=>{if(editingDivida){setDividas(p=>p.filter(r=>r.id!==editingDivida.id));closeAll();}};
+    const deleteInvest=()=>{if(editingInvest){setInvestimentos(p=>p.filter(r=>r.id!==editingInvest.id));closeAll();}};
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const openEditGanho=(row: Record<string,any>)=>{const r=row as Ganho;setEditingGanho(r);setModalGanho(true);};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const openEditFixa=(row: Record<string,any>)=>{const r=row as DespesaFixa;setEditingFixa(r);setModalFixa(true);};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const openEditDV=(row: Record<string,any>)=>{const r=row as DespesaVariavel;setEditingDV(r);setModal(true);};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const openEditDivida=(row: Record<string,any>)=>{const r=row as Divida;setEditingDivida(r);setModalDivida(true);};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const openEditInvest=(row: Record<string,any>)=>{const r=row as Investimento;setEditingInvest(r);setModalInvest(true);};
 
     const qTabs=["1º Quadrimestre","2º Quadrimestre","3º Quadrimestre"];
     const vis=balMensal.slice(qTabs.indexOf(qTab)*4,qTabs.indexOf(qTab)*4+4);
-    const gF=byMonth(dataGanhos,"balanco",gM);
-    const fF=byMonth(dataFixas,"balanco",fM);
+    const gF=byMonth(ganhos,"balanco",gM);
+    const fF=byMonth(fixas,"balanco",fM);
     const vF=byMonth(variaveis,"balanco",vM);
-    const dF=byMonth(dataDividas,"balanco",dM);
-    const iF=byMonth(dataInvest,"balanco",iM);
+    const dF=byMonth(dividas,"balanco",dM);
+    const iF=byMonth(investimentos,"balanco",iM);
     const tR=balMensal.reduce((s,m)=>s+m.receita,0);
     const tD=balMensal.reduce((s,m)=>s+m.despesa,0);
     const tB=tR-tD;
@@ -249,18 +324,18 @@ export default function FinancasDashboard() {
                 </section>
 
                 {/* GANHOS */}
-                <section><SH title="Ganhos"/><MT a={gM} o={setGM}/>
+                <section><SH title="Ganhos" onAdd={()=>{setEditingGanho(null);setModalGanho(true);}}/><MT a={gM} o={setGM}/>
                     <div className="mt-3"><Tbl cols={[
                         {key:"descricao",label:"Descrição",render:r=><span className="font-medium text-zinc-900">{r.descricao}</span>},
                         {key:"fonte",label:"Fonte de Renda",render:r=><B>{r.fonte}</B>},
                         {key:"data",label:"Data",render:r=><span className="text-zinc-500">{r.data}</span>},
                         {key:"valor",label:"Valor",align:"right",render:r=><span className="font-mono font-semibold text-emerald-600">{fmt(r.valor)}</span>},
                         {key:"balanco",label:"Balanço",render:r=><span className="text-zinc-400">{r.balanco}</span>},
-                    ]} data={gF} footer={[{label:"Contagem",value:gF.length},{label:"Soma",value:fmt(gF.reduce((s,g)=>s+g.valor,0))}]}/></div>
+                    ]} data={gF} footer={[{label:"Contagem",value:gF.length},{label:"Soma",value:fmt(gF.reduce((s,g)=>s+g.valor,0))}]} onRowClick={openEditGanho}/></div>
                 </section>
 
                 {/* DESPESAS FIXAS */}
-                <section><SH title="Despesas Fixas"/><MT a={fM} o={setFM}/>
+                <section><SH title="Despesas Fixas" onAdd={()=>{setEditingFixa(null);setModalFixa(true);}}/><MT a={fM} o={setFM}/>
                     <div className="mt-3"><Tbl cols={[
                         {key:"descricao",label:"Descrição",render:r=><span className="font-medium text-zinc-900">{r.descricao}</span>},
                         {key:"categoria",label:"Categoria",render:r=><B>{r.categoria}</B>},
@@ -269,11 +344,11 @@ export default function FinancasDashboard() {
                         {key:"status",label:"Status",render:r=><SB s={r.status}/>},
                         {key:"dataPgto",label:"Data Pgto",render:r=><span className="text-zinc-500">{r.dataPgto}</span>},
                         {key:"forma",label:"Forma",render:r=>r.forma?<B>{r.forma}</B>:<span className="text-zinc-300">—</span>},
-                    ]} data={fF} footer={[{label:"Contagem",value:fF.length},{label:"Soma",value:fmt(fF.reduce((s,d)=>s+d.valor,0))},{label:"Concluídos",value:`${fF.length>0?Math.round((fF.filter(d=>d.status==="Pago").length/fF.length)*100):0}%`}]}/></div>
+                    ]} data={fF} footer={[{label:"Contagem",value:fF.length},{label:"Soma",value:fmt(fF.reduce((s,d)=>s+d.valor,0))},{label:"Concluídos",value:`${fF.length>0?Math.round((fF.filter(d=>d.status==="Pago").length/fF.length)*100):0}%`}]} onRowClick={openEditFixa}/></div>
                 </section>
 
                 {/* DESPESAS VARIÁVEIS */}
-                <section><SH title="Despesas Variáveis" onAdd={()=>setModal(true)}/><MT a={vM} o={setVM}/>
+                <section><SH title="Despesas Variáveis" onAdd={()=>{setEditingDV(null);setModal(true);}}/><MT a={vM} o={setVM}/>
                     <div className="mt-3"><Tbl cols={[
                         {key:"descricao",label:"Descrição",render:r=><span className="font-medium text-zinc-900">{r.descricao}</span>},
                         {key:"categoria",label:"Categoria",render:r=><B>{r.categoria}</B>},
@@ -281,11 +356,11 @@ export default function FinancasDashboard() {
                         {key:"data",label:"Data",render:r=><span className="text-zinc-500">{r.data}</span>},
                         {key:"balanco",label:"Balanço",render:r=><span className="text-zinc-400">{r.balanco}</span>},
                         {key:"forma",label:"Forma de Pagamento",render:r=>r.forma?<B>{r.forma}</B>:<span className="text-zinc-300">—</span>},
-                    ]} data={vF} footer={[{label:"Contagem",value:vF.length},{label:"Soma",value:fmt(vF.reduce((s,d)=>s+d.valor,0))}]}/></div>
+                    ]} data={vF} footer={[{label:"Contagem",value:vF.length},{label:"Soma",value:fmt(vF.reduce((s,d)=>s+d.valor,0))}]} onRowClick={openEditDV}/></div>
                 </section>
 
                 {/* DÍVIDAS */}
-                <section><SH title="Dívidas"/><MT a={dM} o={setDM}/>
+                <section><SH title="Dívidas" onAdd={()=>{setEditingDivida(null);setModalDivida(true);}}/><MT a={dM} o={setDM}/>
                     <div className="mt-3"><Tbl cols={[
                         {key:"descricao",label:"Descrição",render:r=><span className="font-medium text-zinc-900">{r.descricao}</span>},
                         {key:"destino",label:"Destino",render:r=><B>{r.destino}</B>},
@@ -293,11 +368,11 @@ export default function FinancasDashboard() {
                         {key:"vencimento",label:"Vencimento",render:r=><span className="text-zinc-500">{r.vencimento}</span>},
                         {key:"status",label:"Status",render:r=><SB s={r.status}/>},
                         {key:"balanco",label:"Balanço",render:r=><span className="text-zinc-400">{r.balanco}</span>},
-                    ]} data={dF} footer={[{label:"Contagem",value:dF.length},{label:"Soma",value:fmt(dF.reduce((s,d)=>s+d.valor,0))},{label:"Concluídos",value:`${dF.length>0?Math.round((dF.filter(d=>d.status==="Pago").length/dF.length)*100):0}%`}]}/></div>
+                    ]} data={dF} footer={[{label:"Contagem",value:dF.length},{label:"Soma",value:fmt(dF.reduce((s,d)=>s+d.valor,0))},{label:"Concluídos",value:`${dF.length>0?Math.round((dF.filter(d=>d.status==="Pago").length/dF.length)*100):0}%`}]} onRowClick={openEditDivida}/></div>
                 </section>
 
                 {/* INVESTIMENTOS */}
-                <section><SH title="Investimentos"/><MT a={iM} o={setIM}/>
+                <section><SH title="Investimentos" onAdd={()=>{setEditingInvest(null);setModalInvest(true);}}/><MT a={iM} o={setIM}/>
                     <div className="mt-3"><Tbl cols={[
                         {key:"produto",label:"Produto",render:r=><span className="font-mono font-semibold text-zinc-900">{r.produto}</span>},
                         {key:"empresa",label:"Empresa",render:r=><span className="text-zinc-600">{r.empresa}</span>},
@@ -307,7 +382,7 @@ export default function FinancasDashboard() {
                         {key:"tipoAtivo",label:"Tipo",render:r=><B v={r.tipoAtivo.includes("Fundo")?"warning":"success"}>{r.tipoAtivo}</B>},
                         {key:"provento",label:"Provento",align:"right",render:r=><span className="font-mono text-emerald-600">{fmt(r.provento)}</span>},
                         {key:"frequencia",label:"Frequência",render:r=><B>{r.frequencia}</B>},
-                    ]} data={iF} footer={[{label:"Contagem",value:iF.length},{label:"Média",value:fmt(iF.length>0?iF.reduce((s,x)=>s+x.valor,0)/iF.length:0)},{label:"Soma Total",value:fmt(iF.reduce((s,x)=>s+x.valorTotal,0))}]}/></div>
+                    ]} data={iF} footer={[{label:"Contagem",value:iF.length},{label:"Média",value:fmt(iF.length>0?iF.reduce((s,x)=>s+x.valor,0)/iF.length:0)},{label:"Soma Total",value:fmt(iF.reduce((s,x)=>s+x.valorTotal,0))}]} onRowClick={openEditInvest}/></div>
                 </section>
 
                 {/* METAS FINANCEIRAS */}
@@ -316,7 +391,7 @@ export default function FinancasDashboard() {
                         {dataMetas.map(m=><div key={m.id} className="rounded-xl border border-zinc-200 bg-white p-6 hover:shadow-md hover:border-zinc-300 transition-all">
                             <div className="flex items-center gap-4 mb-5">
                                 <div className="relative"><CP p={m.percent} size={56} sw={4}/><span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-zinc-700">{m.percent}%</span></div>
-                                <h3 className="font-semibold text-zinc-900 flex items-center gap-2"><span className="text-lg">{m.icon}</span>{m.nome}</h3>
+                                <h3 className="font-semibold text-zinc-900 flex items-center gap-2">{m.icon}{m.nome}</h3>
                             </div>
                             <div className="space-y-2.5">
                                 <div className="flex justify-between text-sm"><span className="text-zinc-400">Valor</span><span className="font-mono font-semibold text-zinc-900">{fmt(m.valor)}</span></div>
@@ -333,7 +408,7 @@ export default function FinancasDashboard() {
                         {dataFontes.map(f=><div key={f.nome} className="rounded-xl border border-zinc-200 bg-white p-6 hover:shadow-md hover:border-zinc-300 transition-all">
                             <div className="flex items-center gap-4 mb-5">
                                 <div className="relative"><CP p={f.percent} size={56} sw={4}/><span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-zinc-700">{f.percent}%</span></div>
-                                <h3 className="font-semibold text-zinc-900 flex items-center gap-2"><span className="text-lg">{f.icon}</span>{f.nome}</h3>
+                                <h3 className="font-semibold text-zinc-900 flex items-center gap-2">{f.icon}{f.nome}</h3>
                             </div>
                             <div className="space-y-2.5">
                                 <div className="flex justify-between text-sm"><span className="text-zinc-400">Meta Anual</span><span className="font-mono font-semibold text-zinc-900">{fmt(f.metaAnual)}</span></div>
@@ -349,7 +424,7 @@ export default function FinancasDashboard() {
                         {dataCategs.map(c=><div key={c.nome} className="rounded-xl border border-zinc-200 bg-white p-5 hover:shadow-md hover:border-zinc-300 transition-all">
                             <div className="flex items-center gap-3 mb-3">
                                 <div className="relative"><CP p={c.pct} size={40} sw={3}/><span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-zinc-500">{c.pct>0?`${c.pct}%`:"—"}</span></div>
-                                <h3 className="font-semibold text-zinc-900 text-sm flex items-center gap-1.5"><span>{c.icon}</span>{c.nome}</h3>
+                                <h3 className="font-semibold text-zinc-900 text-sm flex items-center gap-1.5">{c.icon}{c.nome}</h3>
                             </div>
                             <div className="space-y-1.5">
                                 <div className="flex justify-between text-xs"><span className="text-zinc-400">Limite Anual</span><span className="font-mono text-zinc-600">{c.lim?fmt(c.lim):"—"}</span></div>
@@ -365,7 +440,7 @@ export default function FinancasDashboard() {
                         {dataFormas.map(f=><div key={f.nome} className="rounded-xl border border-zinc-200 bg-white p-5 hover:shadow-md hover:border-zinc-300 transition-all">
                             <div className="flex items-center gap-3 mb-3">
                                 <div className="relative"><CP p={f.pct} size={40} sw={3}/><span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-zinc-500">{f.pct}%</span></div>
-                                <h3 className="font-semibold text-zinc-900 text-sm flex items-center gap-1.5"><span>{f.icon}</span>{f.nome}</h3>
+                                <h3 className="font-semibold text-zinc-900 text-sm flex items-center gap-1.5">{f.icon}{f.nome}</h3>
                             </div>
                             <div className="space-y-1.5">
                                 <div className="flex justify-between text-xs"><span className="text-zinc-400">Limite Anual</span><span className="font-mono text-zinc-600">{fmt(f.lim)}</span></div>
@@ -376,7 +451,21 @@ export default function FinancasDashboard() {
                 </section>
             </div>
 
-            <DespesaVariavelModal open={modal} onClose={()=>setModal(false)} onSubmit={addDV}/>
+            <DespesaVariavelModal open={modal} onClose={closeAll} onSubmit={submitDV}
+                initialData={editingDV?{descricao:editingDV.descricao,categoria:editingDV.categoria,valor:String(editingDV.valor),data:editingDV.data,forma:editingDV.forma}:undefined}
+                onDelete={editingDV?deleteDV:undefined}/>
+            <GanhoModal open={modalGanho} onClose={closeAll} onSubmit={submitGanho}
+                initialData={editingGanho?{descricao:editingGanho.descricao,fonte:editingGanho.fonte,data:editingGanho.data,valor:String(editingGanho.valor)}:undefined}
+                onDelete={editingGanho?deleteGanho:undefined}/>
+            <DespesaFixaModal open={modalFixa} onClose={closeAll} onSubmit={submitFixa}
+                initialData={editingFixa?{descricao:editingFixa.descricao,categoria:editingFixa.categoria,valor:String(editingFixa.valor),vencimento:editingFixa.vencimento,status:editingFixa.status,dataPgto:editingFixa.dataPgto,forma:editingFixa.forma}:undefined}
+                onDelete={editingFixa?deleteFixa:undefined}/>
+            <DividaModal open={modalDivida} onClose={closeAll} onSubmit={submitDivida}
+                initialData={editingDivida?{descricao:editingDivida.descricao,destino:editingDivida.destino,valor:String(editingDivida.valor),vencimento:editingDivida.vencimento,status:editingDivida.status}:undefined}
+                onDelete={editingDivida?deleteDivida:undefined}/>
+            <InvestimentoModal open={modalInvest} onClose={closeAll} onSubmit={submitInvest}
+                initialData={editingInvest?{produto:editingInvest.produto,empresa:editingInvest.empresa,valor:String(editingInvest.valor),quantidade:String(editingInvest.quantidade),tipoAtivo:editingInvest.tipoAtivo,provento:String(editingInvest.provento),frequencia:editingInvest.frequencia}:undefined}
+                onDelete={editingInvest?deleteInvest:undefined}/>
         </div>
     );
 }
