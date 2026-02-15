@@ -12,6 +12,7 @@ import categoriasRoutes from "@/routes/categorias";
 import formasPagamentoRoutes from "@/routes/formas-pagamento";
 import { IconPreview } from "@/components/icon-picker";
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@/components/ui/combobox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import DespesaVariavelModal, { type DespesaFormData } from "@/components/despesa-variavel-modal";
 import GanhoModal, { type GanhoFormData } from "@/components/ganho-modal";
@@ -72,6 +73,16 @@ const mmYYYYtoFull = (b: string): string => { const [mm] = b.split("/"); return 
 const byMonth = <T extends Record<string, any>>(d: T[], f: keyof T, a: string): T[] => d.filter(r => r[f] === toFull(a));
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const byMonthMMYYYY = <T extends Record<string, any>>(d: T[], f: keyof T, a: string): T[] => d.filter(r => mmYYYYtoFull(String(r[f])) === toFull(a));
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const unique = <T extends Record<string, any>>(rows: T[], key: string): string[] =>
+    [...new Set(rows.map(r => r[key]).filter((v): v is string => typeof v === "string" && v !== ""))].sort();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const applyFilters = <T extends Record<string, any>>(rows: T[], filters: Record<string, string>): T[] => {
+    const active = Object.entries(filters).filter(([, v]) => v);
+    if (active.length === 0) return rows;
+    return rows.filter(r => active.every(([k, v]) => String(r[k]) === v));
+};
+interface FilterDef { key: string; label: string; options: string[] }
 
 /* ── UI ───────────────────────────────────────────────────────────────────── */
 
@@ -128,14 +139,48 @@ const Tbl = ({cols,data,footer,onRowClick}: {cols: Column[]; data: Record<string
     </div>
 );
 
-const SH = ({title,onAdd}: {title: string; onAdd?: () => void}) => (
-    <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-zinc-900 tracking-tight">{title}</h2>
-        {onAdd&&<button onClick={onAdd} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 active:bg-zinc-700 transition-colors">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg> Novo
-        </button>}
-    </div>
-);
+const SH = ({title,onAdd,filters,activeFilters,onFilterChange}: {title: string; onAdd?: () => void; filters?: FilterDef[]; activeFilters?: Record<string, string>; onFilterChange?: (k: string, v: string) => void}) => {
+    const ac = activeFilters ? Object.values(activeFilters).filter(v => v).length : 0;
+    return (
+        <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-zinc-900 tracking-tight">{title}</h2>
+            <div className="flex items-center gap-2">
+                {filters && filters.length > 0 && onFilterChange && (
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <button className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium border transition-colors ${ac > 0 ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"}`}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                                Filtrar
+                                {ac > 0 && <span className="ml-0.5 bg-white text-zinc-900 text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{ac}</span>}
+                            </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-64 p-4" align="end">
+                            <div className="space-y-3">
+                                {filters.map(f => (
+                                    <div key={f.key} className="space-y-1">
+                                        <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">{f.label}</label>
+                                        <select value={activeFilters?.[f.key] || ""} onChange={e => onFilterChange(f.key, e.target.value)} className="w-full h-8 px-2 rounded-md border border-zinc-200 text-sm text-zinc-700 bg-white focus:outline-none focus:ring-2 focus:ring-zinc-950/10">
+                                            <option value="">Todos</option>
+                                            {f.options.map(o => <option key={o} value={o}>{o}</option>)}
+                                        </select>
+                                    </div>
+                                ))}
+                                {ac > 0 && (
+                                    <button onClick={() => filters.forEach(f => onFilterChange(f.key, ""))} className="w-full h-8 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
+                                        Limpar filtros
+                                    </button>
+                                )}
+                            </div>
+                        </PopoverContent>
+                    </Popover>
+                )}
+                {onAdd&&<button onClick={onAdd} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 active:bg-zinc-700 transition-colors">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg> Novo
+                </button>}
+            </div>
+        </div>
+    );
+};
 
 /* ── APP ──────────────────────────────────────────────────────────────────── */
 
@@ -154,6 +199,11 @@ export default function FinancasDashboard() {
     const [vM,setVM]=useState(currentMonth);
     const [dM,setDM]=useState(currentMonth);
     const [iM,setIM]=useState(currentMonth);
+    const [gFilters,setGFilters]=useState<Record<string,string>>({});
+    const [fFilters,setFFilters]=useState<Record<string,string>>({});
+    const [vFilters,setVFilters]=useState<Record<string,string>>({});
+    const [dFilters,setDFilters]=useState<Record<string,string>>({});
+    const [iFilters,setIFilters]=useState<Record<string,string>>({});
     const [modal,setModal]=useState(false);
     const [modalGanho,setModalGanho]=useState(false);
     const [modalFixa,setModalFixa]=useState(false);
@@ -274,11 +324,21 @@ export default function FinancasDashboard() {
 
     const qTabs=["1º Quadrimestre","2º Quadrimestre","3º Quadrimestre"];
     const vis=balancoMensal.slice(qTabs.indexOf(qTab)*4,qTabs.indexOf(qTab)*4+4);
-    const gF=byMonth(dataGanhos,"balanco",gM);
-    const fF=byMonth(dataFixas,"balanco",fM);
-    const vF=byMonthMMYYYY(dataVar,"balanco",vM);
-    const dF=byMonth(dataDividas,"balanco",dM);
-    const iF=byMonth(dataInvest,"balanco",iM);
+    const gMonth=byMonth(dataGanhos,"balanco",gM);
+    const fMonth=byMonth(dataFixas,"balanco",fM);
+    const vMonth=byMonthMMYYYY(dataVar,"balanco",vM);
+    const dMonth=byMonth(dataDividas,"balanco",dM);
+    const iMonth=byMonth(dataInvest,"balanco",iM);
+    const gF=applyFilters(gMonth,gFilters);
+    const fF=applyFilters(fMonth,fFilters);
+    const vF=applyFilters(vMonth,vFilters);
+    const dF=applyFilters(dMonth,dFilters);
+    const iF=applyFilters(iMonth,iFilters);
+    const gFD:FilterDef[]=[{key:"fonte",label:"Fonte de Renda",options:unique(gMonth,"fonte")}];
+    const fFD:FilterDef[]=[{key:"categoria",label:"Categoria",options:unique(fMonth,"categoria")},{key:"status",label:"Status",options:unique(fMonth,"status")},{key:"forma",label:"Forma",options:unique(fMonth,"forma")}];
+    const vFD:FilterDef[]=[{key:"categoria",label:"Categoria",options:unique(vMonth,"categoria")},{key:"forma",label:"Forma de Pagamento",options:unique(vMonth,"forma")}];
+    const dFD:FilterDef[]=[{key:"destino",label:"Destino",options:unique(dMonth,"destino")},{key:"status",label:"Status",options:unique(dMonth,"status")}];
+    const iFD:FilterDef[]=[{key:"tipoAtivo",label:"Tipo de Ativo",options:unique(iMonth,"tipoAtivo")},{key:"frequencia",label:"Frequência",options:unique(iMonth,"frequencia")}];
     const tR=balancoMensal.reduce((s,m)=>s+m.receita,0);
     const tD=balancoMensal.reduce((s,m)=>s+m.despesa,0);
     const tB=tR-tD;
@@ -340,18 +400,17 @@ export default function FinancasDashboard() {
                 </section>
 
                 {/* GANHOS */}
-                <section><SH title="Ganhos" onAdd={()=>{setEditingGanho(null);setModalGanho(true);}}/><MT a={gM} o={setGM}/>
+                <section><SH title="Ganhos" onAdd={()=>{setEditingGanho(null);setModalGanho(true);}} filters={gFD} activeFilters={gFilters} onFilterChange={(k,v)=>setGFilters(p=>({...p,[k]:v}))}/><MT a={gM} o={setGM}/>
                     <div className="mt-3"><Tbl cols={[
                         {key:"descricao",label:"Descrição",render:r=><span className="font-medium text-zinc-900">{r.descricao}</span>},
                         {key:"fonte",label:"Fonte de Renda",render:r=><B>{r.fonte}</B>},
                         {key:"data",label:"Data",render:r=><span className="text-zinc-500">{r.data}</span>},
                         {key:"valor",label:"Valor",align:"right",render:r=><span className="font-mono font-semibold text-emerald-600">{fmt(r.valor)}</span>},
-                        {key:"balanco",label:"Balanço",render:r=><span className="text-zinc-400">{r.balanco}</span>},
                     ]} data={gF} footer={[{label:"Contagem",value:gF.length},{label:"Soma",value:fmt(gF.reduce((s,g)=>s+g.valor,0))}]} onRowClick={openEditGanho}/></div>
                 </section>
 
                 {/* DESPESAS FIXAS */}
-                <section><SH title="Despesas Fixas" onAdd={()=>{setEditingFixa(null);setModalFixa(true);}}/><MT a={fM} o={setFM}/>
+                <section><SH title="Despesas Fixas" onAdd={()=>{setEditingFixa(null);setModalFixa(true);}} filters={fFD} activeFilters={fFilters} onFilterChange={(k,v)=>setFFilters(p=>({...p,[k]:v}))}/><MT a={fM} o={setFM}/>
                     <div className="mt-3"><Tbl cols={[
                         {key:"descricao",label:"Descrição",render:r=><span className="font-medium text-zinc-900">{r.descricao}</span>},
                         {key:"categoria",label:"Categoria",render:r=><B>{r.categoria}</B>},
@@ -364,31 +423,29 @@ export default function FinancasDashboard() {
                 </section>
 
                 {/* DESPESAS VARIÁVEIS */}
-                <section><SH title="Despesas Variáveis" onAdd={()=>{setEditingDV(null);setModal(true);}}/><MT a={vM} o={setVM}/>
+                <section><SH title="Despesas Variáveis" onAdd={()=>{setEditingDV(null);setModal(true);}} filters={vFD} activeFilters={vFilters} onFilterChange={(k,v)=>setVFilters(p=>({...p,[k]:v}))}/><MT a={vM} o={setVM}/>
                     <div className="mt-3"><Tbl cols={[
                         {key:"descricao",label:"Descrição",render:r=><span className="font-medium text-zinc-900">{r.descricao}</span>},
                         {key:"categoria",label:"Categoria",render:r=><B>{r.categoria}</B>},
                         {key:"valor",label:"Valor",align:"right",render:r=><span className="font-mono">{fmt(r.valor)}</span>},
                         {key:"data",label:"Data",render:r=><span className="text-zinc-500">{r.data}</span>},
-                        {key:"balanco",label:"Balanço",render:r=><span className="text-zinc-400">{mmYYYYtoFull(r.balanco)}</span>},
                         {key:"forma",label:"Forma de Pagamento",render:r=>r.forma?<B>{r.forma}</B>:<span className="text-zinc-300">—</span>},
                     ]} data={vF} footer={[{label:"Contagem",value:vF.length},{label:"Soma",value:fmt(vF.reduce((s,d)=>s+d.valor,0))}]} onRowClick={openEditDV}/></div>
                 </section>
 
                 {/* DÍVIDAS */}
-                <section><SH title="Dívidas" onAdd={()=>{setEditingDivida(null);setModalDivida(true);}}/><MT a={dM} o={setDM}/>
+                <section><SH title="Dívidas" onAdd={()=>{setEditingDivida(null);setModalDivida(true);}} filters={dFD} activeFilters={dFilters} onFilterChange={(k,v)=>setDFilters(p=>({...p,[k]:v}))}/><MT a={dM} o={setDM}/>
                     <div className="mt-3"><Tbl cols={[
                         {key:"descricao",label:"Descrição",render:r=><span className="font-medium text-zinc-900">{r.descricao}</span>},
                         {key:"destino",label:"Destino",render:r=><B>{r.destino}</B>},
                         {key:"valor",label:"Valor",align:"right",render:r=><span className="font-mono">{fmt(r.valor)}</span>},
                         {key:"vencimento",label:"Vencimento",render:r=><span className="text-zinc-500">{r.vencimento}</span>},
                         {key:"status",label:"Status",render:r=><SB s={r.status}/>},
-                        {key:"balanco",label:"Balanço",render:r=><span className="text-zinc-400">{r.balanco}</span>},
                     ]} data={dF} footer={[{label:"Contagem",value:dF.length},{label:"Soma",value:fmt(dF.reduce((s,d)=>s+d.valor,0))},{label:"Concluídos",value:`${dF.length>0?Math.round((dF.filter(d=>d.status==="Pago").length/dF.length)*100):0}%`}]} onRowClick={openEditDivida}/></div>
                 </section>
 
                 {/* INVESTIMENTOS */}
-                <section><SH title="Investimentos" onAdd={()=>{setEditingInvest(null);setModalInvest(true);}}/><MT a={iM} o={setIM}/>
+                <section><SH title="Investimentos" onAdd={()=>{setEditingInvest(null);setModalInvest(true);}} filters={iFD} activeFilters={iFilters} onFilterChange={(k,v)=>setIFilters(p=>({...p,[k]:v}))}/><MT a={iM} o={setIM}/>
                     <div className="mt-3"><Tbl cols={[
                         {key:"produto",label:"Produto",render:r=><span className="font-mono font-semibold text-zinc-900">{r.produto}</span>},
                         {key:"empresa",label:"Empresa",render:r=><span className="text-zinc-600">{r.empresa}</span>},
