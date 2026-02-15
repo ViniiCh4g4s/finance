@@ -1,11 +1,32 @@
 <?php
 
+use App\Http\Controllers\CategoriaController;
+use App\Http\Controllers\DespesaFixaController;
+use App\Http\Controllers\DespesaVariavelController;
+use App\Http\Controllers\DividaController;
+use App\Http\Controllers\FonteRendaController;
+use App\Http\Controllers\FormaPagamentoController;
+use App\Http\Controllers\GanhoController;
+use App\Http\Controllers\InvestimentoController;
+use App\Http\Controllers\MetaController;
+use App\Http\Controllers\WelcomeController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::get('/', function () {
-    return Inertia::render('welcome');
-})->middleware(['auth'])->name('home');
+Route::middleware('auth')->group(function () {
+    Route::get('/', [WelcomeController::class, 'index'])->name('home');
+
+    Route::resource('ganhos', GanhoController::class)->only(['store', 'update', 'destroy']);
+    Route::resource('despesas-fixas', DespesaFixaController::class)->only(['store', 'update', 'destroy']);
+    Route::resource('despesas-variaveis', DespesaVariavelController::class)->only(['store', 'update', 'destroy']);
+    Route::resource('dividas', DividaController::class)->only(['store', 'update', 'destroy']);
+    Route::resource('investimentos', InvestimentoController::class)->only(['store', 'update', 'destroy']);
+    Route::resource('metas', MetaController::class)->only(['store', 'update', 'destroy']);
+    Route::post('metas/{meta}/investir', [MetaController::class, 'investir'])->name('metas.investir');
+    Route::resource('fontes-renda', FonteRendaController::class)->only(['store', 'update', 'destroy']);
+    Route::resource('categorias', CategoriaController::class)->only(['store', 'update', 'destroy']);
+    Route::resource('formas-pagamento', FormaPagamentoController::class)->only(['store', 'update', 'destroy']);
+});
 
 Route::get('dashboard', function () {
     return Inertia::render('dashboard');
