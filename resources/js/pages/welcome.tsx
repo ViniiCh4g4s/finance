@@ -1,12 +1,25 @@
 import { type ReactNode, useState } from "react";
-import { Link, usePage } from "@inertiajs/react";
+import { Link, usePage, router } from "@inertiajs/react";
 import { logout } from "@/routes";
+import ganhos from "@/routes/ganhos";
+import despesasFixas from "@/routes/despesas-fixas";
+import despesasVariaveis from "@/routes/despesas-variaveis";
+import dividas from "@/routes/dividas";
+import investimentos from "@/routes/investimentos";
+import metas from "@/routes/metas";
+import fontesRendaRoutes from "@/routes/fontes-renda";
+import categoriasRoutes from "@/routes/categorias";
+import formasPagamentoRoutes from "@/routes/formas-pagamento";
 import { Gem, TrendingUp, Home, Briefcase, BarChart3, Wrench, GraduationCap, CreditCard, ShoppingCart, HeartPulse, Car, Hammer, Gamepad2, TrendingDown, UtensilsCrossed, ShoppingBag, Banknote, FileText, Zap } from "lucide-react";
+import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@/components/ui/combobox";
+import { Spinner } from "@/components/ui/spinner";
 import DespesaVariavelModal, { type DespesaFormData } from "@/components/despesa-variavel-modal";
 import GanhoModal, { type GanhoFormData } from "@/components/ganho-modal";
 import DespesaFixaModal, { type DespesaFixaFormData } from "@/components/despesa-fixa-modal";
 import DividaModal, { type DividaFormData } from "@/components/divida-modal";
-import InvestimentoModal, { type InvestimentoFormData } from "@/components/investimento-modal";
+import InvestimentoModal, { type InvestimentoFormData, type MetaInvestFormData } from "@/components/investimento-modal";
+import MetaModal, { type MetaFormData } from "@/components/meta-modal";
+import ConfigModal, { type ConfigFormData } from "@/components/config-modal";
 
 /* ── TYPES ─────────────────────────────────────────────────────────────────── */
 
@@ -15,11 +28,29 @@ interface Ganho { id: number; descricao: string; fonte: string; data: string; va
 interface DespesaFixa { id: number; descricao: string; categoria: string; valor: number; vencimento: string; status: string; dataPgto: string; forma: string; balanco: string }
 interface DespesaVariavel { id: number; descricao: string; categoria: string; valor: number; data: string; balanco: string; forma: string }
 interface Divida { id: number; descricao: string; destino: string; valor: number; vencimento: string; status: string; balanco: string }
-interface Investimento { id: number; produto: string; empresa: string; valor: number; quantidade: number; valorTotal: number; tipoAtivo: string; provento: number; frequencia: string; balanco: string }
-interface Meta { id: number; nome: string; icon: ReactNode; percent: number; valor: number; investido: number; faltante: number }
-interface FonteRenda { nome: string; icon: ReactNode; percent: number; metaAnual: number; receitaAnual: number }
-interface Categoria { nome: string; icon: ReactNode; pct: number; lim: number | null; desp: number }
-interface FormaPagamento { nome: string; icon: ReactNode; pct: number; lim: number; desp: number }
+interface Investimento { id: number; produto: string; empresa: string; valor: number; quantidade: number; valorTotal: number; tipoAtivo: string; provento: number; frequencia: string; data: string; balanco: string }
+interface Meta { id: number; nome: string; percent: number; valor: number; investido: number; faltante: number }
+interface FonteRenda { id: number; nome: string; percent: number; metaAnual: number; receitaAnual: number }
+interface Categoria { id: number; nome: string; pct: number; lim: number | null; desp: number }
+interface FormaPagamento { id: number; nome: string; pct: number; lim: number; desp: number }
+
+interface PageProps {
+    auth: { user: { name: string } };
+    ano: number;
+    balancoMensal: BalancoMensal[];
+    ganhos: Ganho[];
+    fixas: DespesaFixa[];
+    variaveis: DespesaVariavel[];
+    dividas: Divida[];
+    investimentos: Investimento[];
+    metas: Meta[];
+    fontes: FonteRenda[];
+    categorias: Categoria[];
+    formas: FormaPagamento[];
+    configFontes: string[];
+    configCategorias: string[];
+    configFormas: string[];
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface Column<T = any> {
@@ -30,6 +61,39 @@ interface Column<T = any> {
 }
 interface FooterItem { label: string; value: string | number }
 
+/* ── ICON MAPS ─────────────────────────────────────────────────────────────── */
+
+const metaIcons: Record<string, ReactNode> = {
+    "Casamento": <Gem className="size-5 text-zinc-700"/>,
+    "Investimentos": <TrendingUp className="size-5 text-zinc-700"/>,
+    "Imóvel": <Home className="size-5 text-zinc-700"/>,
+};
+const fonteIcons: Record<string, ReactNode> = {
+    "Trabalho": <Briefcase className="size-5 text-zinc-700"/>,
+    "Investimentos": <BarChart3 className="size-5 text-zinc-700"/>,
+    "Manutenções": <Wrench className="size-5 text-zinc-700"/>,
+};
+const categIcons: Record<string, ReactNode> = {
+    "Casa": <Home className="size-4 text-zinc-600"/>,
+    "Profissional": <Briefcase className="size-4 text-zinc-600"/>,
+    "Educação": <GraduationCap className="size-4 text-zinc-600"/>,
+    "Assinaturas": <CreditCard className="size-4 text-zinc-600"/>,
+    "Mercado": <ShoppingCart className="size-4 text-zinc-600"/>,
+    "Farmácia e Saúde": <HeartPulse className="size-4 text-zinc-600"/>,
+    "Transporte": <Car className="size-4 text-zinc-600"/>,
+    "Utilidades": <Hammer className="size-4 text-zinc-600"/>,
+    "Entretenimento": <Gamepad2 className="size-4 text-zinc-600"/>,
+    "Juros e Taxas": <TrendingDown className="size-4 text-zinc-600"/>,
+    "Alimentação": <UtensilsCrossed className="size-4 text-zinc-600"/>,
+    "Shopping": <ShoppingBag className="size-4 text-zinc-600"/>,
+};
+const formaIcons: Record<string, ReactNode> = {
+    "Dinheiro": <Banknote className="size-4 text-zinc-600"/>,
+    "Boleto": <FileText className="size-4 text-zinc-600"/>,
+    "Pix": <Zap className="size-4 text-zinc-600"/>,
+};
+const defaultFormaIcon = <CreditCard className="size-4 text-zinc-600"/>;
+
 /* ── HELPERS ───────────────────────────────────────────────────────────────── */
 
 const MONTHS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"] as const;
@@ -38,74 +102,6 @@ const fmt = (v: number): string => v.toLocaleString("pt-BR",{style:"currency",cu
 const toFull = (a: string): string => FULL[MONTHS.indexOf(a as typeof MONTHS[number])] || a;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const byMonth = <T extends Record<string, any>>(d: T[], f: keyof T, a: string): T[] => d.filter(r => r[f] === toFull(a));
-let nid = 50;
-
-const balMensal: BalancoMensal[] = [
-    {mes:"Janeiro",receita:3000,despesa:1223.19},{mes:"Fevereiro",receita:3000,despesa:765.37},
-    {mes:"Março",receita:3000,despesa:765.37},{mes:"Abril",receita:3000,despesa:2906.41},
-    {mes:"Maio",receita:3000,despesa:1100},{mes:"Junho",receita:3000,despesa:890.5},
-    {mes:"Julho",receita:3000,despesa:1450},{mes:"Agosto",receita:3000,despesa:980},
-    {mes:"Setembro",receita:3000,despesa:1200},{mes:"Outubro",receita:3000,despesa:1050},
-    {mes:"Novembro",receita:3000,despesa:1300},{mes:"Dezembro",receita:3000,despesa:2100},
-];
-const dataGanhos: Ganho[] = [
-    {id:1,descricao:"Salário",fonte:"Trabalho",data:"05/01/2025",valor:2800,balanco:"Janeiro"},
-    {id:2,descricao:"Manutenção Preventiva",fonte:"Manutenções",data:"03/01/2025",valor:200,balanco:"Janeiro"},
-    {id:3,descricao:"Salário",fonte:"Trabalho",data:"05/02/2025",valor:2800,balanco:"Fevereiro"},
-    {id:4,descricao:"Freelance",fonte:"Trabalho",data:"15/03/2025",valor:500,balanco:"Março"},
-    {id:5,descricao:"Salário",fonte:"Trabalho",data:"05/03/2025",valor:2800,balanco:"Março"},
-    {id:6,descricao:"Salário",fonte:"Trabalho",data:"05/04/2025",valor:2800,balanco:"Abril"},
-    {id:7,descricao:"Dividendos KNRI11",fonte:"Investimentos",data:"15/04/2025",valor:1,balanco:"Abril"},
-];
-const dataFixas: DespesaFixa[] = [
-    {id:1,descricao:"Luz",categoria:"Casa",valor:158,vencimento:"07/01/2025",status:"Pago",dataPgto:"05/01/2025",forma:"Pix",balanco:"Janeiro"},
-    {id:2,descricao:"Internet",categoria:"Casa",valor:161.29,vencimento:"10/01/2025",status:"Pago",dataPgto:"08/01/2025",forma:"Pix",balanco:"Janeiro"},
-    {id:3,descricao:"Luz",categoria:"Casa",valor:170,vencimento:"07/02/2025",status:"Pago",dataPgto:"05/02/2025",forma:"Pix",balanco:"Fevereiro"},
-    {id:4,descricao:"Internet",categoria:"Casa",valor:161.29,vencimento:"10/02/2025",status:"Pago",dataPgto:"08/02/2025",forma:"Pix",balanco:"Fevereiro"},
-    {id:5,descricao:"Luz",categoria:"Casa",valor:164.62,vencimento:"07/06/2025",status:"Pago",dataPgto:"05/06/2025",forma:"Pix",balanco:"Junho"},
-    {id:6,descricao:"Internet",categoria:"Casa",valor:161.29,vencimento:"10/06/2025",status:"Pago",dataPgto:"05/06/2025",forma:"Pix",balanco:"Junho"},
-];
-const initVar: DespesaVariavel[] = [
-    {id:1,descricao:"iCloud 2TB",categoria:"Assinaturas",valor:55,data:"28/01/2025",balanco:"Janeiro",forma:""},
-    {id:2,descricao:"Moises",categoria:"Assinaturas",valor:9.9,data:"14/01/2025",balanco:"Janeiro",forma:""},
-    {id:3,descricao:"Ração",categoria:"Casa",valor:164.62,data:"07/01/2025",balanco:"Janeiro",forma:""},
-    {id:4,descricao:"Uber",categoria:"Transporte",valor:45,data:"12/02/2025",balanco:"Fevereiro",forma:"Cartão de Crédito Nubank"},
-    {id:5,descricao:"Farmácia",categoria:"Farmácia e Saúde",valor:89.9,data:"20/03/2025",balanco:"Março",forma:"Pix"},
-    {id:6,descricao:"Supermercado",categoria:"Mercado",valor:320,data:"10/04/2025",balanco:"Abril",forma:"Cartão de Débito"},
-];
-const dataDividas: Divida[] = [
-    {id:1,descricao:"Cartão Tenda",destino:"Tenda Atacado",valor:400,vencimento:"11/06/2025",status:"Pendente",balanco:"Janeiro"},
-    {id:2,descricao:"Ativos S.A",destino:"Banco do Brasil",valor:90.95,vencimento:"28/05/2025",status:"Pendente",balanco:"Janeiro"},
-];
-const dataInvest: Investimento[] = [
-    {id:1,produto:"ITSA4",empresa:"Itaúsa",valor:11.07,quantidade:1,valorTotal:11.07,tipoAtivo:"Ação Brasileira",provento:0.05,frequencia:"Trimestral",balanco:"Janeiro"},
-    {id:2,produto:"KNRI11",empresa:"Kinea Renda Im.",valor:146.36,quantidade:1,valorTotal:146.36,tipoAtivo:"Fundo Imobiliário",provento:1,frequencia:"Mensal",balanco:"Janeiro"},
-];
-const dataMetas: Meta[] = [
-    {id:1,nome:"Casamento",icon:<Gem className="size-5 text-zinc-700"/>,percent:17,valor:15000,investido:2541.04,faltante:12458.96},
-    {id:2,nome:"Investimentos",icon:<TrendingUp className="size-5 text-zinc-700"/>,percent:40,valor:3000,investido:1196.45,faltante:1803.55},
-    {id:3,nome:"Imóvel",icon:<Home className="size-5 text-zinc-700"/>,percent:68,valor:9500,investido:6497.52,faltante:3002.48},
-];
-const dataFontes: FonteRenda[] = [
-    {nome:"Trabalho",icon:<Briefcase className="size-5 text-zinc-700"/>,percent:87,metaAnual:42000,receitaAnual:36521.94},
-    {nome:"Investimentos",icon:<BarChart3 className="size-5 text-zinc-700"/>,percent:62,metaAnual:5000,receitaAnual:3100},
-    {nome:"Manutenções",icon:<Wrench className="size-5 text-zinc-700"/>,percent:71,metaAnual:5000,receitaAnual:3535},
-];
-const dataCategs: Categoria[] = [
-    {nome:"Casa",icon:<Home className="size-4 text-zinc-600"/>,pct:43,lim:10000,desp:4295.42},{nome:"Profissional",icon:<Briefcase className="size-4 text-zinc-600"/>,pct:110,lim:1000,desp:1101.48},
-    {nome:"Educação",icon:<GraduationCap className="size-4 text-zinc-600"/>,pct:25,lim:1000,desp:253.5},{nome:"Assinaturas",icon:<CreditCard className="size-4 text-zinc-600"/>,pct:136,lim:1000,desp:1358.95},
-    {nome:"Mercado",icon:<ShoppingCart className="size-4 text-zinc-600"/>,pct:14,lim:1500,desp:209.91},{nome:"Farmácia e Saúde",icon:<HeartPulse className="size-4 text-zinc-600"/>,pct:272,lim:200,desp:544.86},
-    {nome:"Transporte",icon:<Car className="size-4 text-zinc-600"/>,pct:0,lim:null,desp:516.37},{nome:"Utilidades",icon:<Hammer className="size-4 text-zinc-600"/>,pct:0,lim:null,desp:2350.48},
-    {nome:"Entretenimento",icon:<Gamepad2 className="size-4 text-zinc-600"/>,pct:0,lim:null,desp:2186.25},{nome:"Juros e Taxas",icon:<TrendingDown className="size-4 text-zinc-600"/>,pct:0,lim:null,desp:1001.23},
-    {nome:"Alimentação",icon:<UtensilsCrossed className="size-4 text-zinc-600"/>,pct:0,lim:null,desp:1482.23},{nome:"Shopping",icon:<ShoppingBag className="size-4 text-zinc-600"/>,pct:0,lim:null,desp:1486.45},
-];
-const dataFormas: FormaPagamento[] = [
-    {nome:"Dinheiro",icon:<Banknote className="size-4 text-zinc-600"/>,pct:70,lim:1000,desp:700},{nome:"Boleto",icon:<FileText className="size-4 text-zinc-600"/>,pct:32,lim:4000,desp:1263.31},
-    {nome:"Pix",icon:<Zap className="size-4 text-zinc-600"/>,pct:28,lim:7000,desp:1985.23},{nome:"Cartão de Débito",icon:<CreditCard className="size-4 text-zinc-600"/>,pct:33,lim:1500,desp:499.56},
-    {nome:"Cartão de Crédito Itaú",icon:<CreditCard className="size-4 text-zinc-600"/>,pct:167,lim:5000,desp:8345.92},
-    {nome:"Cartão de Crédito Nubank",icon:<CreditCard className="size-4 text-zinc-600"/>,pct:65,lim:2000,desp:1294.68},
-    {nome:"Cartão de Crédito Nubank PJ",icon:<CreditCard className="size-4 text-zinc-600"/>,pct:96,lim:3000,desp:2878.22},
-];
 
 /* ── UI ───────────────────────────────────────────────────────────────────── */
 
@@ -133,12 +129,12 @@ const B = ({children,v="default"}: {children: ReactNode; v?: BadgeVariant}) => {
 
 const SB = ({s}: {s: string}) => s==="Pago"?<B v="success">● Pago</B>:<B v="danger">● Pendente</B>;
 
-const Tabs = ({tabs,active,onChange}: {tabs: readonly string[]; active: string; onChange: (tab: string) => void}) => (
+const TabsNav = ({tabs,active,onChange}: {tabs: readonly string[]; active: string; onChange: (tab: string) => void}) => (
     <div className="flex items-center gap-1 overflow-x-auto pb-1" style={{scrollbarWidth:"none"}}>
         {tabs.map(t=><button key={t} onClick={()=>onChange(t)} className={`whitespace-nowrap px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${active===t?"bg-zinc-900 text-white shadow-sm":"text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100"}`}>{t}</button>)}
     </div>
 );
-const MT = ({a,o}: {a: string; o: (tab: string) => void}) => <Tabs tabs={MONTHS} active={a} onChange={o}/>;
+const MT = ({a,o}: {a: string; o: (tab: string) => void}) => <TabsNav tabs={MONTHS} active={a} onChange={o}/>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const Tbl = ({cols,data,footer,onRowClick}: {cols: Column[]; data: Record<string, any>[]; footer?: FooterItem[]; onRowClick?: (row: Record<string, any>) => void}) => (
@@ -173,23 +169,21 @@ const SH = ({title,onAdd}: {title: string; onAdd?: () => void}) => (
 
 /* ── APP ──────────────────────────────────────────────────────────────────── */
 
+const currentMonth = MONTHS[new Date().getMonth()];
 const currentYear = new Date().getFullYear();
-const yearOptions = Array.from({length: 5}, (_, i) => currentYear - 2 + i);
+const yearOptions = Array.from({length: 5}, (_, i) => String(currentYear - 2 + i));
 
 export default function FinancasDashboard() {
-    const { auth } = usePage().props;
-    const [ano, setAno] = useState(currentYear);
-    const [ganhos, setGanhos] = useState(dataGanhos);
-    const [fixas, setFixas] = useState(dataFixas);
-    const [variaveis, setVariaveis] = useState(initVar);
-    const [dividas, setDividas] = useState(dataDividas);
-    const [investimentos, setInvestimentos] = useState(dataInvest);
-    const [qTab, setQTab] = useState("1º Quadrimestre");
-    const [gM,setGM]=useState("Jan");
-    const [fM,setFM]=useState("Jan");
-    const [vM,setVM]=useState("Jan");
-    const [dM,setDM]=useState("Jan");
-    const [iM,setIM]=useState("Jan");
+    const props = usePage<PageProps>().props;
+    const { auth, ano, balancoMensal, ganhos: dataGanhos, fixas: dataFixas, variaveis: dataVar, dividas: dataDividas, investimentos: dataInvest, metas: dataMetas, fontes: dataFontes, categorias: dataCategs, formas: dataFormas, configFontes, configCategorias, configFormas } = props;
+
+    const curQ = Math.floor(new Date().getMonth() / 4);
+    const [qTab, setQTab] = useState(["1º Quadrimestre","2º Quadrimestre","3º Quadrimestre"][curQ]);
+    const [gM,setGM]=useState(currentMonth);
+    const [fM,setFM]=useState(currentMonth);
+    const [vM,setVM]=useState(currentMonth);
+    const [dM,setDM]=useState(currentMonth);
+    const [iM,setIM]=useState(currentMonth);
     const [modal,setModal]=useState(false);
     const [modalGanho,setModalGanho]=useState(false);
     const [modalFixa,setModalFixa]=useState(false);
@@ -200,56 +194,98 @@ export default function FinancasDashboard() {
     const [editingFixa,setEditingFixa]=useState<DespesaFixa|null>(null);
     const [editingDivida,setEditingDivida]=useState<Divida|null>(null);
     const [editingInvest,setEditingInvest]=useState<Investimento|null>(null);
+    const [modalMeta,setModalMeta]=useState(false);
+    const [editingMeta,setEditingMeta]=useState<Meta|null>(null);
+    const [modalFonte,setModalFonte]=useState(false);
+    const [editingFonte,setEditingFonte]=useState<FonteRenda|null>(null);
+    const [modalCategoria,setModalCategoria]=useState(false);
+    const [editingCategoria,setEditingCategoria]=useState<Categoria|null>(null);
+    const [modalForma,setModalForma]=useState(false);
+    const [editingForma,setEditingForma]=useState<FormaPagamento|null>(null);
 
-    const closeAll=()=>{setModal(false);setModalGanho(false);setModalFixa(false);setModalDivida(false);setModalInvest(false);setEditingDV(null);setEditingGanho(null);setEditingFixa(null);setEditingDivida(null);setEditingInvest(null);};
+    const [loading, setLoading] = useState(false);
+    const [deleteConfirm, setDeleteConfirm] = useState<{ action: () => void } | null>(null);
+    const [deleting, setDeleting] = useState(false);
+
+    const closeAll=()=>{setModal(false);setModalGanho(false);setModalFixa(false);setModalDivida(false);setModalInvest(false);setModalMeta(false);setModalFonte(false);setModalCategoria(false);setModalForma(false);setEditingDV(null);setEditingGanho(null);setEditingFixa(null);setEditingDivida(null);setEditingInvest(null);setEditingMeta(null);setEditingFonte(null);setEditingCategoria(null);setEditingForma(null);};
+
+    const rOpts = { preserveScroll: true, preserveState: true, onSuccess: closeAll, onFinish: () => setLoading(false) };
 
     const submitDV=(data: DespesaFormData)=>{
-        if(editingDV){
-            setVariaveis(p=>p.map(r=>r.id===editingDV.id?{...r,descricao:data.descricao,categoria:data.categoria,valor:parseFloat(data.valor),data:data.data,forma:data.forma}:r));
-        } else {
-            setVariaveis(p=>[...p,{id:nid++,descricao:data.descricao,categoria:data.categoria,valor:parseFloat(data.valor),data:data.data,balanco:toFull(vM),forma:data.forma}]);
-        }
-        closeAll();
+        setLoading(true);
+        if(editingDV) router.put(despesasVariaveis.update(editingDV.id).url, data, rOpts);
+        else router.post(despesasVariaveis.store().url, data, rOpts);
     };
     const submitGanho=(data: GanhoFormData)=>{
-        if(editingGanho){
-            setGanhos(p=>p.map(r=>r.id===editingGanho.id?{...r,descricao:data.descricao,fonte:data.fonte,data:data.data,valor:parseFloat(data.valor)}:r));
-        } else {
-            setGanhos(p=>[...p,{id:nid++,descricao:data.descricao,fonte:data.fonte,data:data.data,valor:parseFloat(data.valor),balanco:toFull(gM)}]);
-        }
-        closeAll();
+        setLoading(true);
+        if(editingGanho) router.put(ganhos.update(editingGanho.id).url, data, rOpts);
+        else router.post(ganhos.store().url, data, rOpts);
     };
     const submitFixa=(data: DespesaFixaFormData)=>{
-        if(editingFixa){
-            setFixas(p=>p.map(r=>r.id===editingFixa.id?{...r,descricao:data.descricao,categoria:data.categoria,valor:parseFloat(data.valor),vencimento:data.vencimento,status:data.status,dataPgto:data.dataPgto,forma:data.forma}:r));
-        } else {
-            setFixas(p=>[...p,{id:nid++,descricao:data.descricao,categoria:data.categoria,valor:parseFloat(data.valor),vencimento:data.vencimento,status:data.status,dataPgto:data.dataPgto,forma:data.forma,balanco:toFull(fM)}]);
-        }
-        closeAll();
+        setLoading(true);
+        if(editingFixa) router.put(despesasFixas.update(editingFixa.id).url, data, rOpts);
+        else router.post(despesasFixas.store().url, data, rOpts);
     };
     const submitDivida=(data: DividaFormData)=>{
-        if(editingDivida){
-            setDividas(p=>p.map(r=>r.id===editingDivida.id?{...r,descricao:data.descricao,destino:data.destino,valor:parseFloat(data.valor),vencimento:data.vencimento,status:data.status}:r));
-        } else {
-            setDividas(p=>[...p,{id:nid++,descricao:data.descricao,destino:data.destino,valor:parseFloat(data.valor),vencimento:data.vencimento,status:data.status,balanco:toFull(dM)}]);
-        }
-        closeAll();
+        setLoading(true);
+        if(editingDivida) router.put(dividas.update(editingDivida.id).url, data, rOpts);
+        else router.post(dividas.store().url, data, rOpts);
     };
     const submitInvest=(data: InvestimentoFormData)=>{
-        const val=parseFloat(data.valor),qty=parseInt(data.quantidade);
-        if(editingInvest){
-            setInvestimentos(p=>p.map(r=>r.id===editingInvest.id?{...r,produto:data.produto,empresa:data.empresa,valor:val,quantidade:qty,valorTotal:val*qty,tipoAtivo:data.tipoAtivo,provento:parseFloat(data.provento||"0"),frequencia:data.frequencia}:r));
-        } else {
-            setInvestimentos(p=>[...p,{id:nid++,produto:data.produto,empresa:data.empresa,valor:val,quantidade:qty,valorTotal:val*qty,tipoAtivo:data.tipoAtivo,provento:parseFloat(data.provento||"0"),frequencia:data.frequencia,balanco:toFull(iM)}]);
-        }
-        closeAll();
+        setLoading(true);
+        if(editingInvest) router.put(investimentos.update(editingInvest.id).url, data, rOpts);
+        else router.post(investimentos.store().url, data, rOpts);
+    };
+    const submitMeta=(data: MetaFormData)=>{
+        setLoading(true);
+        if(editingMeta) router.put(metas.update(editingMeta.id).url, { ...data }, rOpts);
+        else router.post(metas.store().url, { ...data }, rOpts);
+    };
+    const submitMetaInvest=(data: MetaInvestFormData)=>{
+        setLoading(true);
+        router.post(metas.investir(data.metaId).url, { valor: data.valor, data: data.data }, rOpts);
     };
 
-    const deleteDV=()=>{if(editingDV){setVariaveis(p=>p.filter(r=>r.id!==editingDV.id));closeAll();}};
-    const deleteGanho=()=>{if(editingGanho){setGanhos(p=>p.filter(r=>r.id!==editingGanho.id));closeAll();}};
-    const deleteFixa=()=>{if(editingFixa){setFixas(p=>p.filter(r=>r.id!==editingFixa.id));closeAll();}};
-    const deleteDivida=()=>{if(editingDivida){setDividas(p=>p.filter(r=>r.id!==editingDivida.id));closeAll();}};
-    const deleteInvest=()=>{if(editingInvest){setInvestimentos(p=>p.filter(r=>r.id!==editingInvest.id));closeAll();}};
+    const submitFonte=(data: ConfigFormData)=>{
+        setLoading(true);
+        if(editingFonte) router.put(fontesRendaRoutes.update(editingFonte.id).url, { nome: data.nome, meta_anual: data.valor }, rOpts);
+        else router.post(fontesRendaRoutes.store().url, { nome: data.nome, meta_anual: data.valor }, rOpts);
+    };
+    const submitCategoria=(data: ConfigFormData)=>{
+        setLoading(true);
+        if(editingCategoria) router.put(categoriasRoutes.update(editingCategoria.id).url, { nome: data.nome, limite_anual: data.valor }, rOpts);
+        else router.post(categoriasRoutes.store().url, { nome: data.nome, limite_anual: data.valor }, rOpts);
+    };
+    const submitForma=(data: ConfigFormData)=>{
+        setLoading(true);
+        if(editingForma) router.put(formasPagamentoRoutes.update(editingForma.id).url, { nome: data.nome, limite_anual: data.valor }, rOpts);
+        else router.post(formasPagamentoRoutes.store().url, { nome: data.nome, limite_anual: data.valor }, rOpts);
+    };
+
+    const requestDelete = (url: string) => {
+        closeAll();
+        setDeleteConfirm({
+            action: () => {
+                setDeleting(true);
+                router.delete(url, {
+                    preserveScroll: true,
+                    preserveState: true,
+                    onSuccess: () => setDeleteConfirm(null),
+                    onFinish: () => setDeleting(false),
+                });
+            },
+        });
+    };
+
+    const requestDeleteDV=()=>{if(editingDV) requestDelete(despesasVariaveis.destroy(editingDV.id).url);};
+    const requestDeleteGanho=()=>{if(editingGanho) requestDelete(ganhos.destroy(editingGanho.id).url);};
+    const requestDeleteFixa=()=>{if(editingFixa) requestDelete(despesasFixas.destroy(editingFixa.id).url);};
+    const requestDeleteDivida=()=>{if(editingDivida) requestDelete(dividas.destroy(editingDivida.id).url);};
+    const requestDeleteInvest=()=>{if(editingInvest) requestDelete(investimentos.destroy(editingInvest.id).url);};
+    const requestDeleteMeta=()=>{if(editingMeta) requestDelete(metas.destroy(editingMeta.id).url);};
+    const requestDeleteFonte=()=>{if(editingFonte) requestDelete(fontesRendaRoutes.destroy(editingFonte.id).url);};
+    const requestDeleteCategoria=()=>{if(editingCategoria) requestDelete(categoriasRoutes.destroy(editingCategoria.id).url);};
+    const requestDeleteForma=()=>{if(editingForma) requestDelete(formasPagamentoRoutes.destroy(editingForma.id).url);};
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const openEditGanho=(row: Record<string,any>)=>{const r=row as Ganho;setEditingGanho(r);setModalGanho(true);};
@@ -262,15 +298,19 @@ export default function FinancasDashboard() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const openEditInvest=(row: Record<string,any>)=>{const r=row as Investimento;setEditingInvest(r);setModalInvest(true);};
 
+    const changeAno = (newAno: number) => {
+        router.visit('/', { data: { ano: newAno }, preserveState: true });
+    };
+
     const qTabs=["1º Quadrimestre","2º Quadrimestre","3º Quadrimestre"];
-    const vis=balMensal.slice(qTabs.indexOf(qTab)*4,qTabs.indexOf(qTab)*4+4);
-    const gF=byMonth(ganhos,"balanco",gM);
-    const fF=byMonth(fixas,"balanco",fM);
-    const vF=byMonth(variaveis,"balanco",vM);
-    const dF=byMonth(dividas,"balanco",dM);
-    const iF=byMonth(investimentos,"balanco",iM);
-    const tR=balMensal.reduce((s,m)=>s+m.receita,0);
-    const tD=balMensal.reduce((s,m)=>s+m.despesa,0);
+    const vis=balancoMensal.slice(qTabs.indexOf(qTab)*4,qTabs.indexOf(qTab)*4+4);
+    const gF=byMonth(dataGanhos,"balanco",gM);
+    const fF=byMonth(dataFixas,"balanco",fM);
+    const vF=byMonth(dataVar,"balanco",vM);
+    const dF=byMonth(dataDividas,"balanco",dM);
+    const iF=byMonth(dataInvest,"balanco",iM);
+    const tR=balancoMensal.reduce((s,m)=>s+m.receita,0);
+    const tD=balancoMensal.reduce((s,m)=>s+m.despesa,0);
     const tB=tR-tD;
 
     return (
@@ -291,14 +331,20 @@ export default function FinancasDashboard() {
                             <div className="text-right"><p className="text-[11px] text-zinc-400 uppercase tracking-wider">Balanço</p><p className={`text-sm font-bold ${tB>=0?"text-emerald-600":"text-red-600"}`}>{fmt(tB)}</p></div>
                         </div>
                         <div className="h-8 w-px bg-zinc-200 hidden md:block"/>
-                        <select value={ano} onChange={e=>setAno(Number(e.target.value))} className="h-8 px-2 pr-7 rounded-md border border-zinc-200 text-sm font-medium text-zinc-700 bg-white focus:outline-none focus:ring-2 focus:ring-zinc-950/10 focus:border-zinc-400 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2371717a%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M6%209l6%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_6px_center]">
-                            {yearOptions.map(y=><option key={y} value={y}>{y}</option>)}
-                        </select>
+                        <Combobox items={yearOptions} value={String(ano)} onValueChange={val => { if(val) changeAno(Number(val)); }}>
+                            <ComboboxInput placeholder="Ano" className="w-23 h-8 text-sm font-medium" />
+                            <ComboboxContent>
+                                <ComboboxEmpty>Nenhum ano.</ComboboxEmpty>
+                                <ComboboxList>
+                                    {item => <ComboboxItem key={item} value={item}>{item}</ComboboxItem>}
+                                </ComboboxList>
+                            </ComboboxContent>
+                        </Combobox>
                         {auth.user && <>
                             <div className="h-8 w-px bg-zinc-200"/>
                             <div className="flex items-center gap-3">
                                 <span className="text-sm font-medium text-zinc-700">{auth.user.name}</span>
-                                <Link href={logout()} method="post" as="button" className="text-sm text-zinc-400 hover:text-zinc-700 transition-colors">Sair</Link>
+                                <Link href={logout().url} method="post" as="button" className="text-sm text-zinc-400 hover:text-zinc-700 transition-colors">Sair</Link>
                             </div>
                         </>}
                     </div>
@@ -308,9 +354,9 @@ export default function FinancasDashboard() {
             <div className="max-w-7xl mx-auto px-6 py-8 space-y-10">
 
                 {/* BALANÇO MENSAL */}
-                <section><SH title="Balanço Mensal"/><Tabs tabs={qTabs} active={qTab} onChange={setQTab}/>
+                <section><SH title="Balanço Mensal"/><TabsNav tabs={qTabs} active={qTab} onChange={setQTab}/>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
-                        {vis.map(m=>{const p=Math.round((m.despesa/m.receita)*100),b=m.receita-m.despesa;return(
+                        {vis.map(m=>{const p=Math.round((m.despesa/m.receita)*100)||0,b=m.receita-m.despesa;return(
                             <div key={m.mes} className="rounded-xl border border-zinc-200 bg-white p-5 hover:shadow-md hover:border-zinc-300 transition-all">
                                 <div className="flex items-center justify-between mb-4"><h3 className="font-semibold text-zinc-900">{m.mes}</h3><span className={`text-xs font-mono font-semibold px-2 py-0.5 rounded-md ${p>90?"bg-red-50 text-red-600":"bg-zinc-100 text-zinc-600"}`}>{p}%</span></div>
                                 <div className="space-y-1.5 mb-4">
@@ -386,12 +432,12 @@ export default function FinancasDashboard() {
                 </section>
 
                 {/* METAS FINANCEIRAS */}
-                <section><SH title="Metas Financeiras"/>
+                <section><SH title="Metas Financeiras" onAdd={()=>{setEditingMeta(null);setModalMeta(true);}}/>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {dataMetas.map(m=><div key={m.id} className="rounded-xl border border-zinc-200 bg-white p-6 hover:shadow-md hover:border-zinc-300 transition-all">
+                        {dataMetas.map(m=><div key={m.id} onClick={()=>{setEditingMeta(m);setModalMeta(true);}} className="cursor-pointer rounded-xl border border-zinc-200 bg-white p-6 hover:shadow-md hover:border-zinc-300 transition-all">
                             <div className="flex items-center gap-4 mb-5">
                                 <div className="relative"><CP p={m.percent} size={56} sw={4}/><span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-zinc-700">{m.percent}%</span></div>
-                                <h3 className="font-semibold text-zinc-900 flex items-center gap-2">{m.icon}{m.nome}</h3>
+                                <h3 className="font-semibold text-zinc-900 flex items-center gap-2">{metaIcons[m.nome] || <Gem className="size-5 text-zinc-700"/>}{m.nome}</h3>
                             </div>
                             <div className="space-y-2.5">
                                 <div className="flex justify-between text-sm"><span className="text-zinc-400">Valor</span><span className="font-mono font-semibold text-zinc-900">{fmt(m.valor)}</span></div>
@@ -403,12 +449,12 @@ export default function FinancasDashboard() {
                 </section>
 
                 {/* FONTES DE RENDA */}
-                <section><SH title="Fontes de Renda"/>
+                <section><SH title="Fontes de Renda" onAdd={()=>{setEditingFonte(null);setModalFonte(true);}}/>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {dataFontes.map(f=><div key={f.nome} className="rounded-xl border border-zinc-200 bg-white p-6 hover:shadow-md hover:border-zinc-300 transition-all">
+                        {dataFontes.map(f=><div key={f.id} onClick={()=>{setEditingFonte(f);setModalFonte(true);}} className="cursor-pointer rounded-xl border border-zinc-200 bg-white p-6 hover:shadow-md hover:border-zinc-300 transition-all">
                             <div className="flex items-center gap-4 mb-5">
                                 <div className="relative"><CP p={f.percent} size={56} sw={4}/><span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-zinc-700">{f.percent}%</span></div>
-                                <h3 className="font-semibold text-zinc-900 flex items-center gap-2">{f.icon}{f.nome}</h3>
+                                <h3 className="font-semibold text-zinc-900 flex items-center gap-2">{fonteIcons[f.nome] || <Briefcase className="size-5 text-zinc-700"/>}{f.nome}</h3>
                             </div>
                             <div className="space-y-2.5">
                                 <div className="flex justify-between text-sm"><span className="text-zinc-400">Meta Anual</span><span className="font-mono font-semibold text-zinc-900">{fmt(f.metaAnual)}</span></div>
@@ -419,12 +465,12 @@ export default function FinancasDashboard() {
                 </section>
 
                 {/* CATEGORIAS */}
-                <section><SH title="Categorias"/>
+                <section><SH title="Categorias" onAdd={()=>{setEditingCategoria(null);setModalCategoria(true);}}/>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {dataCategs.map(c=><div key={c.nome} className="rounded-xl border border-zinc-200 bg-white p-5 hover:shadow-md hover:border-zinc-300 transition-all">
+                        {dataCategs.map(c=><div key={c.id} onClick={()=>{setEditingCategoria(c);setModalCategoria(true);}} className="cursor-pointer rounded-xl border border-zinc-200 bg-white p-5 hover:shadow-md hover:border-zinc-300 transition-all">
                             <div className="flex items-center gap-3 mb-3">
                                 <div className="relative"><CP p={c.pct} size={40} sw={3}/><span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-zinc-500">{c.pct>0?`${c.pct}%`:"—"}</span></div>
-                                <h3 className="font-semibold text-zinc-900 text-sm flex items-center gap-1.5">{c.icon}{c.nome}</h3>
+                                <h3 className="font-semibold text-zinc-900 text-sm flex items-center gap-1.5">{categIcons[c.nome] || <ShoppingBag className="size-4 text-zinc-600"/>}{c.nome}</h3>
                             </div>
                             <div className="space-y-1.5">
                                 <div className="flex justify-between text-xs"><span className="text-zinc-400">Limite Anual</span><span className="font-mono text-zinc-600">{c.lim?fmt(c.lim):"—"}</span></div>
@@ -435,12 +481,12 @@ export default function FinancasDashboard() {
                 </section>
 
                 {/* FORMAS DE PAGAMENTO */}
-                <section><SH title="Formas de Pagamento"/>
+                <section><SH title="Formas de Pagamento" onAdd={()=>{setEditingForma(null);setModalForma(true);}}/>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {dataFormas.map(f=><div key={f.nome} className="rounded-xl border border-zinc-200 bg-white p-5 hover:shadow-md hover:border-zinc-300 transition-all">
+                        {dataFormas.map(f=><div key={f.id} onClick={()=>{setEditingForma(f);setModalForma(true);}} className="cursor-pointer rounded-xl border border-zinc-200 bg-white p-5 hover:shadow-md hover:border-zinc-300 transition-all">
                             <div className="flex items-center gap-3 mb-3">
                                 <div className="relative"><CP p={f.pct} size={40} sw={3}/><span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-zinc-500">{f.pct}%</span></div>
-                                <h3 className="font-semibold text-zinc-900 text-sm flex items-center gap-1.5">{f.icon}{f.nome}</h3>
+                                <h3 className="font-semibold text-zinc-900 text-sm flex items-center gap-1.5">{formaIcons[f.nome] || defaultFormaIcon}{f.nome}</h3>
                             </div>
                             <div className="space-y-1.5">
                                 <div className="flex justify-between text-xs"><span className="text-zinc-400">Limite Anual</span><span className="font-mono text-zinc-600">{fmt(f.lim)}</span></div>
@@ -451,21 +497,62 @@ export default function FinancasDashboard() {
                 </section>
             </div>
 
-            <DespesaVariavelModal open={modal} onClose={closeAll} onSubmit={submitDV}
+            <DespesaVariavelModal open={modal} onClose={closeAll} onSubmit={submitDV} loading={loading}
+                categorias={configCategorias} formas={configFormas}
                 initialData={editingDV?{descricao:editingDV.descricao,categoria:editingDV.categoria,valor:String(editingDV.valor),data:editingDV.data,forma:editingDV.forma}:undefined}
-                onDelete={editingDV?deleteDV:undefined}/>
-            <GanhoModal open={modalGanho} onClose={closeAll} onSubmit={submitGanho}
+                onDelete={editingDV?requestDeleteDV:undefined}/>
+            <GanhoModal open={modalGanho} onClose={closeAll} onSubmit={submitGanho} loading={loading}
+                fontes={configFontes}
                 initialData={editingGanho?{descricao:editingGanho.descricao,fonte:editingGanho.fonte,data:editingGanho.data,valor:String(editingGanho.valor)}:undefined}
-                onDelete={editingGanho?deleteGanho:undefined}/>
-            <DespesaFixaModal open={modalFixa} onClose={closeAll} onSubmit={submitFixa}
+                onDelete={editingGanho?requestDeleteGanho:undefined}/>
+            <DespesaFixaModal open={modalFixa} onClose={closeAll} onSubmit={submitFixa} loading={loading}
+                categorias={configCategorias} formas={configFormas}
                 initialData={editingFixa?{descricao:editingFixa.descricao,categoria:editingFixa.categoria,valor:String(editingFixa.valor),vencimento:editingFixa.vencimento,status:editingFixa.status,dataPgto:editingFixa.dataPgto,forma:editingFixa.forma}:undefined}
-                onDelete={editingFixa?deleteFixa:undefined}/>
-            <DividaModal open={modalDivida} onClose={closeAll} onSubmit={submitDivida}
+                onDelete={editingFixa?requestDeleteFixa:undefined}/>
+            <DividaModal open={modalDivida} onClose={closeAll} onSubmit={submitDivida} loading={loading}
                 initialData={editingDivida?{descricao:editingDivida.descricao,destino:editingDivida.destino,valor:String(editingDivida.valor),vencimento:editingDivida.vencimento,status:editingDivida.status}:undefined}
-                onDelete={editingDivida?deleteDivida:undefined}/>
-            <InvestimentoModal open={modalInvest} onClose={closeAll} onSubmit={submitInvest}
-                initialData={editingInvest?{produto:editingInvest.produto,empresa:editingInvest.empresa,valor:String(editingInvest.valor),quantidade:String(editingInvest.quantidade),tipoAtivo:editingInvest.tipoAtivo,provento:String(editingInvest.provento),frequencia:editingInvest.frequencia}:undefined}
-                onDelete={editingInvest?deleteInvest:undefined}/>
+                onDelete={editingDivida?requestDeleteDivida:undefined}/>
+            <InvestimentoModal open={modalInvest} onClose={closeAll} onSubmit={submitInvest} loading={loading}
+                onSubmitMeta={submitMetaInvest}
+                metas={dataMetas.map(m=>({id:m.id,nome:m.nome,valor:m.valor,investido:m.investido}))}
+                initialData={editingInvest?{produto:editingInvest.produto,empresa:editingInvest.empresa,valor:String(editingInvest.valor),quantidade:String(editingInvest.quantidade),tipoAtivo:editingInvest.tipoAtivo,provento:String(editingInvest.provento),frequencia:editingInvest.frequencia,data:editingInvest.data}:undefined}
+                onDelete={editingInvest?requestDeleteInvest:undefined}/>
+            <MetaModal open={modalMeta} onClose={closeAll} onSubmit={submitMeta} loading={loading}
+                initialData={editingMeta?{nome:editingMeta.nome,valor:String(editingMeta.valor)}:undefined}
+                onDelete={editingMeta?requestDeleteMeta:undefined}/>
+
+            <ConfigModal open={modalFonte} onClose={closeAll} onSubmit={submitFonte} loading={loading}
+                title="Fonte de Renda" valorLabel="Meta Anual (R$)" valorPlaceholder="0,00"
+                initialData={editingFonte?{nome:editingFonte.nome,valor:String(editingFonte.metaAnual||"")}:undefined}
+                onDelete={editingFonte?requestDeleteFonte:undefined}/>
+            <ConfigModal open={modalCategoria} onClose={closeAll} onSubmit={submitCategoria} loading={loading}
+                title="Categoria" valorLabel="Limite Anual (R$)" valorPlaceholder="0,00"
+                initialData={editingCategoria?{nome:editingCategoria.nome,valor:editingCategoria.lim!=null?String(editingCategoria.lim):""}:undefined}
+                onDelete={editingCategoria?requestDeleteCategoria:undefined}/>
+            <ConfigModal open={modalForma} onClose={closeAll} onSubmit={submitForma} loading={loading}
+                title="Forma de Pagamento" valorLabel="Limite Anual (R$)" valorPlaceholder="0,00"
+                initialData={editingForma?{nome:editingForma.nome,valor:String(editingForma.lim||"")}:undefined}
+                onDelete={editingForma?requestDeleteForma:undefined}/>
+
+            {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO */}
+            {deleteConfirm && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ animation: "fi .15s ease" }}>
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !deleting && setDeleteConfirm(null)} />
+                    <div className="relative bg-white rounded-xl shadow-2xl border border-zinc-200 w-full max-w-sm mx-4 p-6" style={{ animation: "si .2s ease" }}>
+                        <h3 className="text-base font-semibold text-zinc-900">Excluir registro?</h3>
+                        <p className="text-sm text-zinc-500 mt-2">Essa ação não pode ser desfeita. O registro será removido permanentemente.</p>
+                        <div className="flex justify-end gap-3 mt-6">
+                            <button onClick={() => setDeleteConfirm(null)} disabled={deleting} className="h-9 px-4 rounded-md border border-zinc-200 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors disabled:opacity-50">
+                                Cancelar
+                            </button>
+                            <button onClick={deleteConfirm.action} disabled={deleting} className="h-9 px-4 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center gap-2">
+                                {deleting ? <><Spinner className="size-4" /> Excluindo...</> : "Excluir"}
+                            </button>
+                        </div>
+                    </div>
+                    <style>{`@keyframes fi{from{opacity:0}to{opacity:1}}@keyframes si{from{opacity:0;transform:scale(.96) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}`}</style>
+                </div>
+            )}
         </div>
     );
 }

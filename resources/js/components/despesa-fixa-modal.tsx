@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@/components/ui/combobox";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Spinner } from "@/components/ui/spinner";
 
 export interface DespesaFixaFormData {
     descricao: string;
@@ -24,10 +24,13 @@ interface Props {
     onSubmit: (data: DespesaFixaFormData) => void;
     initialData?: DespesaFixaFormData;
     onDelete?: () => void;
+    categorias?: string[];
+    formas?: string[];
+    loading?: boolean;
 }
 
-const CATEGORIAS = ["Casa", "Assinaturas", "Transporte", "Farmácia e Saúde", "Mercado", "Alimentação", "Entretenimento", "Shopping", "Utilidades", "Outros"];
-const FORMAS = ["Pix", "Boleto", "Dinheiro", "Cartão de Débito", "Cartão de Crédito Itaú", "Cartão de Crédito Nubank", "Cartão de Crédito Nubank PJ"];
+const CATEGORIAS_DEFAULT = ["Casa", "Assinaturas", "Transporte", "Farmácia e Saúde", "Mercado", "Alimentação", "Entretenimento", "Shopping", "Utilidades", "Outros"];
+const FORMAS_DEFAULT = ["Pix", "Boleto", "Dinheiro", "Cartão de Débito", "Cartão de Crédito Itaú", "Cartão de Crédito Nubank", "Cartão de Crédito Nubank PJ"];
 const STATUS = ["Pago", "Pendente"];
 
 const empty: DespesaFixaFormData = { descricao: "", categoria: "", valor: "", vencimento: "", status: "", dataPgto: "", forma: "" };
@@ -41,7 +44,7 @@ const toDate = (s: string): Date | undefined => {
 };
 const toStr = (d: Date | undefined): string => d ? format(d, "dd/MM/yyyy") : "";
 
-export default function DespesaFixaModal({ open, onClose, onSubmit, initialData, onDelete }: Props) {
+export default function DespesaFixaModal({ open, onClose, onSubmit, initialData, onDelete, categorias, formas, loading }: Props) {
     const [form, setForm] = useState<DespesaFixaFormData>(empty);
     const sf = (k: keyof DespesaFixaFormData, v: string) => setForm(p => ({ ...p, [k]: v }));
     const editing = !!initialData;
@@ -52,12 +55,11 @@ export default function DespesaFixaModal({ open, onClose, onSubmit, initialData,
         if (open) setForm(initialData ?? empty);
     }, [open]);
 
-    const handleClose = () => { setForm(empty); onClose(); };
+    const handleClose = () => { if (loading) return; setForm(empty); onClose(); };
 
     const handleSubmit = () => {
         if (!form.descricao || !form.valor || !form.vencimento) return;
         onSubmit(form);
-        setForm(empty);
     };
 
     if (!open) return null;
@@ -68,7 +70,7 @@ export default function DespesaFixaModal({ open, onClose, onSubmit, initialData,
             <div className="relative bg-white rounded-xl shadow-2xl border border-zinc-200 w-full max-w-lg mx-4" style={{ animation: "si .2s ease" }}>
                 <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
                     <h3 className="text-base font-semibold text-zinc-900">{editing ? "Editar Despesa Fixa" : "Nova Despesa Fixa"}</h3>
-                    <button onClick={handleClose} className="p-1.5 rounded-md hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition-colors">
+                    <button onClick={handleClose} disabled={loading} className="p-1.5 rounded-md hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition-colors disabled:opacity-50">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
                     </button>
                 </div>
@@ -80,7 +82,7 @@ export default function DespesaFixaModal({ open, onClose, onSubmit, initialData,
                     <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1.5">
                             <label className="block text-sm font-medium text-zinc-700">Categoria</label>
-                            <Combobox items={CATEGORIAS} value={form.categoria || null} onValueChange={val => sf("categoria", val ?? "")}>
+                            <Combobox items={categorias ?? CATEGORIAS_DEFAULT} value={form.categoria || null} onValueChange={val => sf("categoria", val ?? "")}>
                                 <ComboboxInput placeholder="Selecione..." className="w-full" />
                                 <ComboboxContent>
                                     <ComboboxEmpty>Nenhum item encontrado.</ComboboxEmpty>
@@ -154,7 +156,7 @@ export default function DespesaFixaModal({ open, onClose, onSubmit, initialData,
                         </div>
                         <div className="space-y-1.5">
                             <label className="block text-sm font-medium text-zinc-700">Forma de Pagamento</label>
-                            <Combobox items={FORMAS} value={form.forma || null} onValueChange={val => sf("forma", val ?? "")}>
+                            <Combobox items={formas ?? FORMAS_DEFAULT} value={form.forma || null} onValueChange={val => sf("forma", val ?? "")}>
                                 <ComboboxInput placeholder="Selecione..." className="w-full" />
                                 <ComboboxContent>
                                     <ComboboxEmpty>Nenhum item encontrado.</ComboboxEmpty>
@@ -165,28 +167,14 @@ export default function DespesaFixaModal({ open, onClose, onSubmit, initialData,
                             </Combobox>
                         </div>
                     </div>
-                    <div className={`pt-1 flex gap-3 ${editing ? "" : "flex-col"}`}>
+                    <div className="pt-1 flex gap-3">
                         {editing && onDelete && (
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <button className="h-10 px-4 rounded-md border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 active:bg-red-100 transition-colors">
-                                        Excluir
-                                    </button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>Excluir registro?</AlertDialogTitle>
-                                        <AlertDialogDescription>Essa ação não pode ser desfeita. O registro será removido permanentemente.</AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction onClick={onDelete}>Excluir</AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
+                            <button onClick={onDelete} disabled={loading} className="h-10 px-4 rounded-md border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 active:bg-red-100 transition-colors disabled:opacity-50">
+                                Excluir
+                            </button>
                         )}
-                        <button onClick={handleSubmit} className="flex-1 h-10 rounded-md bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800 active:bg-zinc-700 transition-colors">
-                            {editing ? "Salvar" : "Adicionar Despesa Fixa"}
+                        <button onClick={handleSubmit} disabled={loading} className="flex-1 h-10 rounded-md bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800 active:bg-zinc-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                            {loading ? <><Spinner className="size-4" />{editing ? " Salvando..." : " Adicionando..."}</> : editing ? "Salvar" : "Adicionar Despesa Fixa"}
                         </button>
                     </div>
                 </div>
