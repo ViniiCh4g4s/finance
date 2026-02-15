@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Meta extends Model
 {
-    protected $fillable = ['nome', 'valor'];
+    protected $fillable = ['nome', 'icone', 'valor'];
 
     protected function casts(): array
     {

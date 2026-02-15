@@ -9,7 +9,7 @@ class FormaPagamento extends Model
 {
     protected $table = 'formas_pagamento';
 
-    protected $fillable = ['nome', 'limite_anual'];
+    protected $fillable = ['nome', 'icone', 'limite_anual'];
 
     protected function casts(): array
     {

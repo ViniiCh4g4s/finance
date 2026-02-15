@@ -1,8 +1,11 @@
 import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
+import IconPicker from "@/components/icon-picker";
+import CurrencyInput from "@/components/currency-input";
 
 export interface ConfigFormData {
     nome: string;
+    icone: string;
     valor: string;
 }
 
@@ -16,22 +19,24 @@ interface Props {
     title: string;
     valorLabel: string;
     valorPlaceholder?: string;
+    defaultIcon?: string;
 }
 
-const empty: ConfigFormData = { nome: "", valor: "" };
+const empty: ConfigFormData = { nome: "", icone: "Briefcase", valor: "" };
 
 const inputCls = "w-full h-9 px-3 rounded-md border border-zinc-200 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-950/10 focus:border-zinc-400 bg-white";
 
-export default function ConfigModal({ open, onClose, onSubmit, initialData, onDelete, loading, title, valorLabel, valorPlaceholder }: Props) {
-    const [form, setForm] = useState<ConfigFormData>(empty);
+export default function ConfigModal({ open, onClose, onSubmit, initialData, onDelete, loading, title, valorLabel, valorPlaceholder, defaultIcon }: Props) {
+    const def: ConfigFormData = { nome: "", icone: defaultIcon ?? "Briefcase", valor: "" };
+    const [form, setForm] = useState<ConfigFormData>(def);
     const sf = (k: keyof ConfigFormData, v: string) => setForm(p => ({ ...p, [k]: v }));
     const editing = !!initialData;
 
     useEffect(() => {
-        if (open) setForm(initialData ?? empty);
+        if (open) setForm(initialData ?? def);
     }, [open]);
 
-    const handleClose = () => { if (loading) return; setForm(empty); onClose(); };
+    const handleClose = () => { if (loading) return; setForm(def); onClose(); };
 
     const handleSubmit = () => {
         if (!form.nome) return;
@@ -50,26 +55,29 @@ export default function ConfigModal({ open, onClose, onSubmit, initialData, onDe
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
                     </button>
                 </div>
-                <div className="px-6 py-5 space-y-4">
+                <form onSubmit={e => { e.preventDefault(); handleSubmit(); }} className="px-6 py-5 space-y-4">
                     <div className="space-y-1.5">
                         <label className="block text-sm font-medium text-zinc-700">Nome</label>
-                        <input placeholder="Ex: Salário, Freelance..." value={form.nome} onChange={e => sf("nome", e.target.value)} className={inputCls} />
+                        <div className="flex gap-2">
+                            <IconPicker value={form.icone} onChange={v => sf("icone", v)} disabled={loading} />
+                            <input placeholder="Ex: Salário, Freelance..." value={form.nome} onChange={e => sf("nome", e.target.value)} className={inputCls} />
+                        </div>
                     </div>
                     <div className="space-y-1.5">
                         <label className="block text-sm font-medium text-zinc-700">{valorLabel}</label>
-                        <input type="number" step="0.01" placeholder={valorPlaceholder ?? "0,00"} value={form.valor} onChange={e => sf("valor", e.target.value)} className={inputCls} />
+                        <CurrencyInput value={form.valor} onChange={v => sf("valor", v)} placeholder={valorPlaceholder} className={inputCls} />
                     </div>
                     <div className="pt-1 flex gap-3">
                         {editing && onDelete && (
-                            <button onClick={onDelete} disabled={loading} className="h-10 px-4 rounded-md border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 active:bg-red-100 transition-colors disabled:opacity-50">
+                            <button type="button" onClick={onDelete} disabled={loading} className="h-10 px-4 rounded-md border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 active:bg-red-100 transition-colors disabled:opacity-50">
                                 Excluir
                             </button>
                         )}
-                        <button onClick={handleSubmit} disabled={loading} className="flex-1 h-10 rounded-md bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800 active:bg-zinc-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                        <button type="submit" disabled={loading} className="flex-1 h-10 rounded-md bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800 active:bg-zinc-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
                             {loading ? <><Spinner className="size-4" />{editing ? " Salvando..." : " Adicionando..."}</> : editing ? "Salvar" : `Adicionar ${title}`}
                         </button>
                     </div>
-                </div>
+                </form>
             </div>
             <style>{`@keyframes fi{from{opacity:0}to{opacity:1}}@keyframes si{from{opacity:0;transform:scale(.96) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}`}</style>
         </div>

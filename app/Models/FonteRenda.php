@@ -9,7 +9,7 @@ class FonteRenda extends Model
 {
     protected $table = 'fontes_renda';
 
-    protected $fillable = ['nome', 'meta_anual'];
+    protected $fillable = ['nome', 'icone', 'meta_anual'];
 
     protected function casts(): array
     {

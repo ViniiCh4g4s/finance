@@ -10,6 +10,7 @@ class FormaPagamentoController extends Controller
     {
         $data = $request->validate([
             'nome' => 'required|string|max:255',
+            'icone' => 'nullable|string|max:255',
             'limite_anual' => 'nullable|numeric|min:0',
         ]);
 
@@ -24,6 +25,7 @@ class FormaPagamentoController extends Controller
 
         $data = $request->validate([
             'nome' => 'required|string|max:255',
+            'icone' => 'nullable|string|max:255',
             'limite_anual' => 'nullable|numeric|min:0',
         ]);
 
