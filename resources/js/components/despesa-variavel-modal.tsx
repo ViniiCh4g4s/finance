@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { format, parse, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ChevronDownIcon } from "lucide-react";
@@ -47,18 +47,6 @@ const toDate = (s: string): Date | undefined => {
 };
 const toStr = (d: Date | undefined): string => d ? format(d, "dd/MM/yyyy") : "";
 
-function generateBalancoOptions(): { label: string; value: string }[] {
-    const now = new Date();
-    const options: { label: string; value: string }[] = [];
-    for (let offset = -3; offset <= 8; offset++) {
-        const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-        const mm = String(d.getMonth() + 1).padStart(2, "0");
-        const yyyy = d.getFullYear();
-        options.push({ label: `${MESES[d.getMonth()]} ${yyyy}`, value: `${mm}/${yyyy}` });
-    }
-    return options;
-}
-
 function balancoFromDate(dateStr: string): string {
     const d = parse(dateStr, "dd/MM/yyyy", new Date());
     if (!isValid(d)) return "";
@@ -74,14 +62,24 @@ function balancoLabel(value: string): string {
     return `${MESES[idx]} ${yyyy}`;
 }
 
+function balancoToDate(value: string): Date | undefined {
+    if (!value) return undefined;
+    const d = parse(value, "MM/yyyy", new Date());
+    return isValid(d) ? d : undefined;
+}
+
+function dateToBalanco(d: Date | undefined): string {
+    if (!d) return "";
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    return `${mm}/${d.getFullYear()}`;
+}
+
 export default function DespesaVariavelModal({ open, onClose, onSubmit, initialData, onDelete, categorias, formas, loading }: Props) {
     const [form, setForm] = useState<DespesaFormData>(empty);
     const sf = (k: keyof DespesaFormData, v: string) => setForm(p => ({ ...p, [k]: v }));
     const editing = !!initialData;
     const [popData, setPopData] = useState(false);
-
-    const balancoOptions = useMemo(() => generateBalancoOptions(), []);
-    const balancoLabels = useMemo(() => balancoOptions.map(o => o.label), [balancoOptions]);
+    const [popBalanco, setPopBalanco] = useState(false);
 
     const isCredito = form.forma.toLowerCase().includes("crédito");
 
@@ -117,8 +115,6 @@ export default function DespesaVariavelModal({ open, onClose, onSubmit, initialD
     };
 
     if (!open) return null;
-
-    const selectedBalancoLabel = balancoLabel(form.balanco);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ animation: "fi .15s ease" }}>
@@ -191,18 +187,24 @@ export default function DespesaVariavelModal({ open, onClose, onSubmit, initialD
                     <div className={`grid gap-3 ${isCredito && !editing ? "grid-cols-2" : "grid-cols-1"}`}>
                         <div className="space-y-1.5">
                             <label className="block text-sm font-medium text-zinc-700">Balanço (mês)</label>
-                            <Combobox items={balancoLabels} value={selectedBalancoLabel || null} onValueChange={val => {
-                                const opt = balancoOptions.find(o => o.label === val);
-                                sf("balanco", opt?.value ?? "");
-                            }}>
-                                <ComboboxInput placeholder="Selecione o mês..." className="w-full" />
-                                <ComboboxContent>
-                                    <ComboboxEmpty>Nenhum mês encontrado.</ComboboxEmpty>
-                                    <ComboboxList>
-                                        {item => <ComboboxItem key={item} value={item}>{item}</ComboboxItem>}
-                                    </ComboboxList>
-                                </ComboboxContent>
-                            </Combobox>
+                            <Popover open={popBalanco} onOpenChange={setPopBalanco}>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" data-empty={!form.balanco} className="w-full h-9 justify-between text-left font-normal text-sm data-[empty=true]:text-muted-foreground">
+                                        {form.balanco ? balancoLabel(form.balanco) : <span>Selecione o mês...</span>}
+                                        <ChevronDownIcon className="size-4 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                        mode="single"
+                                        selected={balancoToDate(form.balanco)}
+                                        onSelect={d => { sf("balanco", dateToBalanco(d)); setPopBalanco(false); }}
+                                        defaultMonth={balancoToDate(form.balanco)}
+                                        locale={ptBR}
+                                        captionLayout="dropdown"
+                                    />
+                                </PopoverContent>
+                            </Popover>
                         </div>
                         {isCredito && !editing && (
                             <div className="space-y-1.5">
