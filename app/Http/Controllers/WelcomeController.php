@@ -15,7 +15,7 @@ class WelcomeController extends Controller
 
         $ganhos = $user->ganhos()->whereYear('data', $ano)->orderBy('data')->get();
         $fixas = $user->despesasFixas()->whereYear('vencimento', $ano)->orderBy('vencimento')->get();
-        $variaveis = $user->despesasVariaveis()->whereYear('data', $ano)->orderBy('data')->get();
+        $variaveis = $user->despesasVariaveis()->whereYear('balanco', $ano)->orderBy('balanco')->get();
         $dividas = $user->dividas()->whereYear('vencimento', $ano)->orderBy('vencimento')->get();
         $investimentos = $user->investimentos()->whereYear('data', $ano)->orderBy('data')->get();
         $metas = $user->metas()->orderBy('nome')->get();
@@ -34,7 +34,7 @@ class WelcomeController extends Controller
             $month = $i + 1;
             $receita = $ganhos->filter(fn ($g) => $g->data->month === $month)->sum('valor');
             $despesa = $fixas->filter(fn ($d) => $d->vencimento->month === $month)->sum('valor')
-                     + $variaveis->filter(fn ($d) => $d->data->month === $month)->sum('valor')
+                     + $variaveis->filter(fn ($d) => $d->balanco->month === $month)->sum('valor')
                      + $dividas->filter(fn ($d) => $d->vencimento->month === $month)->sum('valor');
             return ['mes' => $mes, 'receita' => round($receita, 2), 'despesa' => round($despesa, 2)];
         })->values();
@@ -105,7 +105,7 @@ class WelcomeController extends Controller
                 'valor' => (float) $d->valor,
                 'data' => $fmtDate($d->data),
                 'forma' => $d->forma ?? '',
-                'balanco' => $meses[$d->data->month - 1],
+                'balanco' => $d->balanco->format('m/Y'),
             ])->values(),
             'dividas' => $dividas->map(fn ($d) => [
                 'id' => $d->id,
