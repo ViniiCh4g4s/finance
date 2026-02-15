@@ -67,8 +67,11 @@ const MONTHS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov
 const FULL = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"] as const;
 const fmt = (v: number): string => v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const toFull = (a: string): string => FULL[MONTHS.indexOf(a as typeof MONTHS[number])] || a;
+const mmYYYYtoFull = (b: string): string => { const [mm] = b.split("/"); return FULL[parseInt(mm, 10) - 1] || b; };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const byMonth = <T extends Record<string, any>>(d: T[], f: keyof T, a: string): T[] => d.filter(r => r[f] === toFull(a));
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const byMonthMMYYYY = <T extends Record<string, any>>(d: T[], f: keyof T, a: string): T[] => d.filter(r => mmYYYYtoFull(String(r[f])) === toFull(a));
 
 /* ── UI ───────────────────────────────────────────────────────────────────── */
 
@@ -273,7 +276,7 @@ export default function FinancasDashboard() {
     const vis=balancoMensal.slice(qTabs.indexOf(qTab)*4,qTabs.indexOf(qTab)*4+4);
     const gF=byMonth(dataGanhos,"balanco",gM);
     const fF=byMonth(dataFixas,"balanco",fM);
-    const vF=byMonth(dataVar,"balanco",vM);
+    const vF=byMonthMMYYYY(dataVar,"balanco",vM);
     const dF=byMonth(dataDividas,"balanco",dM);
     const iF=byMonth(dataInvest,"balanco",iM);
     const tR=balancoMensal.reduce((s,m)=>s+m.receita,0);
@@ -367,7 +370,7 @@ export default function FinancasDashboard() {
                         {key:"categoria",label:"Categoria",render:r=><B>{r.categoria}</B>},
                         {key:"valor",label:"Valor",align:"right",render:r=><span className="font-mono">{fmt(r.valor)}</span>},
                         {key:"data",label:"Data",render:r=><span className="text-zinc-500">{r.data}</span>},
-                        {key:"balanco",label:"Balanço",render:r=><span className="text-zinc-400">{r.balanco}</span>},
+                        {key:"balanco",label:"Balanço",render:r=><span className="text-zinc-400">{mmYYYYtoFull(r.balanco)}</span>},
                         {key:"forma",label:"Forma de Pagamento",render:r=>r.forma?<B>{r.forma}</B>:<span className="text-zinc-300">—</span>},
                     ]} data={vF} footer={[{label:"Contagem",value:vF.length},{label:"Soma",value:fmt(vF.reduce((s,d)=>s+d.valor,0))}]} onRowClick={openEditDV}/></div>
                 </section>
@@ -466,7 +469,7 @@ export default function FinancasDashboard() {
 
             <DespesaVariavelModal open={modal} onClose={closeAll} onSubmit={submitDV} loading={loading}
                 categorias={configCategorias} formas={configFormas}
-                initialData={editingDV?{descricao:editingDV.descricao,categoria:editingDV.categoria,valor:String(editingDV.valor),data:editingDV.data,forma:editingDV.forma}:undefined}
+                initialData={editingDV?{descricao:editingDV.descricao,categoria:editingDV.categoria,valor:String(editingDV.valor),data:editingDV.data,forma:editingDV.forma,balanco:editingDV.balanco,parcelas:"1"}:undefined}
                 onDelete={editingDV?requestDeleteDV:undefined}/>
             <GanhoModal open={modalGanho} onClose={closeAll} onSubmit={submitGanho} loading={loading}
                 fontes={configFontes}
