@@ -17,6 +17,7 @@ export interface DespesaFormData {
     forma: string;
     balanco: string;
     parcelas: string;
+    dataLimite: string;
 }
 
 interface Props {
@@ -36,7 +37,7 @@ const PARCELAS = ["1x", "2x", "3x", "4x", "5x", "6x", "7x", "8x", "9x", "10x", "
 
 const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
-const empty: DespesaFormData = { descricao: "", categoria: "", valor: "", data: "", forma: "", balanco: "", parcelas: "1" };
+const empty: DespesaFormData = { descricao: "", categoria: "", valor: "", data: "", forma: "", balanco: "", parcelas: "1", dataLimite: "" };
 
 const inputCls = "w-full h-9 px-3 rounded-md border border-zinc-200 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-950/10 focus:border-zinc-400 bg-white";
 
@@ -80,8 +81,12 @@ export default function DespesaVariavelModal({ open, onClose, onSubmit, initialD
     const editing = !!initialData;
     const [popData, setPopData] = useState(false);
     const [popBalanco, setPopBalanco] = useState(false);
+    const [popDataLimite, setPopDataLimite] = useState(false);
 
     const isCredito = form.forma.toLowerCase().includes("crédito");
+    const isAssinatura = form.categoria.toLowerCase().includes("assinatura");
+    const showParcelas = isCredito && !editing && !isAssinatura;
+    const showDataLimite = isAssinatura && !editing;
 
     useEffect(() => {
         if (open) {
@@ -106,6 +111,13 @@ export default function DespesaVariavelModal({ open, onClose, onSubmit, initialD
             sf("parcelas", "1");
         }
     }, [form.forma]);
+
+    // Reset dataLimite when categoria changes away from assinatura
+    useEffect(() => {
+        if (!isAssinatura) {
+            sf("dataLimite", "");
+        }
+    }, [form.categoria]);
 
     const handleClose = () => { if (loading) return; setForm(empty); onClose(); };
 
@@ -184,7 +196,7 @@ export default function DespesaVariavelModal({ open, onClose, onSubmit, initialD
                             </Combobox>
                         </div>
                     </div>
-                    <div className={`grid gap-3 ${isCredito && !editing ? "grid-cols-2" : "grid-cols-1"}`}>
+                    <div className={`grid gap-3 ${showParcelas || showDataLimite ? "grid-cols-2" : "grid-cols-1"}`}>
                         <div className="space-y-1.5">
                             <label className="block text-sm font-medium text-zinc-700">Balanço (mês)</label>
                             <Popover open={popBalanco} onOpenChange={setPopBalanco}>
@@ -206,7 +218,7 @@ export default function DespesaVariavelModal({ open, onClose, onSubmit, initialD
                                 </PopoverContent>
                             </Popover>
                         </div>
-                        {isCredito && !editing && (
+                        {showParcelas && (
                             <div className="space-y-1.5">
                                 <label className="block text-sm font-medium text-zinc-700">Parcelas</label>
                                 <Combobox items={PARCELAS} value={`${form.parcelas}x`} onValueChange={val => sf("parcelas", val ? val.replace("x", "") : "1")}>
@@ -218,6 +230,29 @@ export default function DespesaVariavelModal({ open, onClose, onSubmit, initialD
                                         </ComboboxList>
                                     </ComboboxContent>
                                 </Combobox>
+                            </div>
+                        )}
+                        {showDataLimite && (
+                            <div className="space-y-1.5">
+                                <label className="block text-sm font-medium text-zinc-700">Data Limite</label>
+                                <Popover open={popDataLimite} onOpenChange={setPopDataLimite}>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" data-empty={!form.dataLimite} className="w-full h-9 justify-between text-left font-normal text-sm data-[empty=true]:text-muted-foreground">
+                                            {form.dataLimite ? balancoLabel(form.dataLimite) : <span>Selecione o mês...</span>}
+                                            <ChevronDownIcon className="size-4 opacity-50" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar
+                                            mode="single"
+                                            selected={balancoToDate(form.dataLimite)}
+                                            onSelect={d => { sf("dataLimite", dateToBalanco(d)); setPopDataLimite(false); }}
+                                            defaultMonth={balancoToDate(form.dataLimite)}
+                                            locale={ptBR}
+                                            captionLayout="dropdown"
+                                        />
+                                    </PopoverContent>
+                                </Popover>
                             </div>
                         )}
                     </div>
