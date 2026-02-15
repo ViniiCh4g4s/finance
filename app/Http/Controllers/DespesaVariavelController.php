@@ -17,15 +17,28 @@ class DespesaVariavelController extends Controller
             'forma' => 'nullable|string|max:255',
             'balanco' => 'required|string',
             'parcelas' => 'nullable|integer|min:1|max:12',
+            'dataLimite' => 'nullable|string',
         ]);
 
         $data['data'] = Carbon::createFromFormat('d/m/Y', $data['data'])->toDateString();
         $balancoDate = Carbon::createFromFormat('m/Y', $data['balanco'])->startOfMonth();
         $parcelas = (int) ($data['parcelas'] ?? 1);
+        $dataLimite = !empty($data['dataLimite'])
+            ? Carbon::createFromFormat('m/Y', $data['dataLimite'])->startOfMonth()
+            : null;
 
-        unset($data['balanco'], $data['parcelas']);
+        unset($data['balanco'], $data['parcelas'], $data['dataLimite']);
 
-        if ($parcelas <= 1) {
+        if ($dataLimite && $dataLimite->gte($balancoDate)) {
+            // Assinatura: criar mesmo registro em cada mês até data limite
+            $current = $balancoDate->copy();
+            while ($current->lte($dataLimite)) {
+                $rec = $data;
+                $rec['balanco'] = $current->toDateString();
+                $request->user()->despesasVariaveis()->create($rec);
+                $current->addMonth();
+            }
+        } elseif ($parcelas <= 1) {
             $data['balanco'] = $balancoDate->toDateString();
             $request->user()->despesasVariaveis()->create($data);
         } else {
