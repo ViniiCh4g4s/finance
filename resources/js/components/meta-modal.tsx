@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import IconPicker from "@/components/icon-picker";
+import CurrencyInput from "@/components/currency-input";
 
 export interface MetaFormData {
     nome: string;
@@ -49,7 +50,7 @@ export default function MetaModal({ open, onClose, onSubmit, initialData, onDele
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
                     </button>
                 </div>
-                <div className="px-6 py-5 space-y-4">
+                <form onSubmit={e => { e.preventDefault(); handleSubmit(); }} className="px-6 py-5 space-y-4">
                     <div className="space-y-1.5">
                         <label className="block text-sm font-medium text-zinc-700">Nome</label>
                         <div className="flex gap-2">
@@ -59,19 +60,19 @@ export default function MetaModal({ open, onClose, onSubmit, initialData, onDele
                     </div>
                     <div className="space-y-1.5">
                         <label className="block text-sm font-medium text-zinc-700">Valor da Meta (R$)</label>
-                        <input type="number" step="0.01" placeholder="0,00" value={form.valor} onChange={e => sf("valor", e.target.value)} className={inputCls} />
+                        <CurrencyInput value={form.valor} onChange={v => sf("valor", v)} className={inputCls} />
                     </div>
                     <div className="pt-1 flex gap-3">
                         {editing && onDelete && (
-                            <button onClick={onDelete} disabled={loading} className="h-10 px-4 rounded-md border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 active:bg-red-100 transition-colors disabled:opacity-50">
+                            <button type="button" onClick={onDelete} disabled={loading} className="h-10 px-4 rounded-md border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 active:bg-red-100 transition-colors disabled:opacity-50">
                                 Excluir
                             </button>
                         )}
-                        <button onClick={handleSubmit} disabled={loading} className="flex-1 h-10 rounded-md bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800 active:bg-zinc-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                        <button type="submit" disabled={loading} className="flex-1 h-10 rounded-md bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800 active:bg-zinc-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
                             {loading ? <><Spinner className="size-4" />{editing ? " Salvando..." : " Adicionando..."}</> : editing ? "Salvar" : "Adicionar Meta"}
                         </button>
                     </div>
-                </div>
+                </form>
             </div>
             <style>{`@keyframes fi{from{opacity:0}to{opacity:1}}@keyframes si{from{opacity:0;transform:scale(.96) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}`}</style>
         </div>

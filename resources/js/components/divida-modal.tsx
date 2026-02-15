@@ -7,6 +7,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@/components/ui/combobox";
 import { Spinner } from "@/components/ui/spinner";
+import CurrencyInput from "@/components/currency-input";
 
 export interface DividaFormData {
     descricao: string;
@@ -67,7 +68,7 @@ export default function DividaModal({ open, onClose, onSubmit, initialData, onDe
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
                     </button>
                 </div>
-                <div className="px-6 py-5 space-y-4">
+                <form onSubmit={e => { e.preventDefault(); handleSubmit(); }} className="px-6 py-5 space-y-4">
                     <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1.5">
                             <label className="block text-sm font-medium text-zinc-700">Descrição</label>
@@ -81,7 +82,7 @@ export default function DividaModal({ open, onClose, onSubmit, initialData, onDe
                     <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1.5">
                             <label className="block text-sm font-medium text-zinc-700">Valor (R$)</label>
-                            <input type="number" step="0.01" placeholder="0,00" value={form.valor} onChange={e => sf("valor", e.target.value)} className={inputCls} />
+                            <CurrencyInput value={form.valor} onChange={v => sf("valor", v)} className={inputCls} />
                         </div>
                         <div className="space-y-1.5">
                             <label className="block text-sm font-medium text-zinc-700">Vencimento</label>
@@ -119,15 +120,15 @@ export default function DividaModal({ open, onClose, onSubmit, initialData, onDe
                     </div>
                     <div className="pt-1 flex gap-3">
                         {editing && onDelete && (
-                            <button onClick={onDelete} disabled={loading} className="h-10 px-4 rounded-md border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 active:bg-red-100 transition-colors disabled:opacity-50">
+                            <button type="button" onClick={onDelete} disabled={loading} className="h-10 px-4 rounded-md border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 active:bg-red-100 transition-colors disabled:opacity-50">
                                 Excluir
                             </button>
                         )}
-                        <button onClick={handleSubmit} disabled={loading} className="flex-1 h-10 rounded-md bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800 active:bg-zinc-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                        <button type="submit" disabled={loading} className="flex-1 h-10 rounded-md bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800 active:bg-zinc-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
                             {loading ? <><Spinner className="size-4" />{editing ? " Salvando..." : " Adicionando..."}</> : editing ? "Salvar" : "Adicionar Dívida"}
                         </button>
                     </div>
-                </div>
+                </form>
             </div>
             <style>{`@keyframes fi{from{opacity:0}to{opacity:1}}@keyframes si{from{opacity:0;transform:scale(.96) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}`}</style>
         </div>
