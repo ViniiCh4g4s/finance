@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Categoria extends Model
 {
-    protected $fillable = ['nome', 'limite_anual'];
+    protected $fillable = ['nome', 'icone', 'limite_anual'];
 
     protected function casts(): array
     {

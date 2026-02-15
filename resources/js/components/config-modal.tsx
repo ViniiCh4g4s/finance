@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
+import IconPicker from "@/components/icon-picker";
 
 export interface ConfigFormData {
     nome: string;
+    icone: string;
     valor: string;
 }
 
@@ -16,22 +18,24 @@ interface Props {
     title: string;
     valorLabel: string;
     valorPlaceholder?: string;
+    defaultIcon?: string;
 }
 
-const empty: ConfigFormData = { nome: "", valor: "" };
+const empty: ConfigFormData = { nome: "", icone: "Briefcase", valor: "" };
 
 const inputCls = "w-full h-9 px-3 rounded-md border border-zinc-200 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-950/10 focus:border-zinc-400 bg-white";
 
-export default function ConfigModal({ open, onClose, onSubmit, initialData, onDelete, loading, title, valorLabel, valorPlaceholder }: Props) {
-    const [form, setForm] = useState<ConfigFormData>(empty);
+export default function ConfigModal({ open, onClose, onSubmit, initialData, onDelete, loading, title, valorLabel, valorPlaceholder, defaultIcon }: Props) {
+    const def: ConfigFormData = { nome: "", icone: defaultIcon ?? "Briefcase", valor: "" };
+    const [form, setForm] = useState<ConfigFormData>(def);
     const sf = (k: keyof ConfigFormData, v: string) => setForm(p => ({ ...p, [k]: v }));
     const editing = !!initialData;
 
     useEffect(() => {
-        if (open) setForm(initialData ?? empty);
+        if (open) setForm(initialData ?? def);
     }, [open]);
 
-    const handleClose = () => { if (loading) return; setForm(empty); onClose(); };
+    const handleClose = () => { if (loading) return; setForm(def); onClose(); };
 
     const handleSubmit = () => {
         if (!form.nome) return;
@@ -53,7 +57,10 @@ export default function ConfigModal({ open, onClose, onSubmit, initialData, onDe
                 <div className="px-6 py-5 space-y-4">
                     <div className="space-y-1.5">
                         <label className="block text-sm font-medium text-zinc-700">Nome</label>
-                        <input placeholder="Ex: Salário, Freelance..." value={form.nome} onChange={e => sf("nome", e.target.value)} className={inputCls} />
+                        <div className="flex gap-2">
+                            <IconPicker value={form.icone} onChange={v => sf("icone", v)} disabled={loading} />
+                            <input placeholder="Ex: Salário, Freelance..." value={form.nome} onChange={e => sf("nome", e.target.value)} className={inputCls} />
+                        </div>
                     </div>
                     <div className="space-y-1.5">
                         <label className="block text-sm font-medium text-zinc-700">{valorLabel}</label>

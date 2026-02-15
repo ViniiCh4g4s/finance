@@ -48,6 +48,7 @@ class WelcomeController extends Controller
             return [
                 'id' => $f->id,
                 'nome' => $f->nome,
+                'icone' => $f->icone,
                 'percent' => $percent,
                 'metaAnual' => $metaAnual,
                 'receitaAnual' => $receitaAnual,
@@ -61,7 +62,7 @@ class WelcomeController extends Controller
             $desp = $despPorCateg->has($c->nome) ? round($despPorCateg[$c->nome]->sum('valor'), 2) : 0;
             $lim = $c->limite_anual ? (float) $c->limite_anual : null;
             $pct = $lim ? round(($desp / $lim) * 100) : 0;
-            return ['id' => $c->id, 'nome' => $c->nome, 'pct' => $pct, 'lim' => $lim, 'desp' => $desp];
+            return ['id' => $c->id, 'nome' => $c->nome, 'icone' => $c->icone, 'pct' => $pct, 'lim' => $lim, 'desp' => $desp];
         });
 
         // Formas de pagamento (agrupa despesas por forma + config)
@@ -70,7 +71,7 @@ class WelcomeController extends Controller
             $desp = $despPorForma->has($f->nome) ? round($despPorForma[$f->nome]->sum('valor'), 2) : 0;
             $lim = $f->limite_anual ? (float) $f->limite_anual : 0;
             $pct = $lim > 0 ? round(($desp / $lim) * 100) : 0;
-            return ['id' => $f->id, 'nome' => $f->nome, 'pct' => $pct, 'lim' => $lim, 'desp' => $desp];
+            return ['id' => $f->id, 'nome' => $f->nome, 'icone' => $f->icone, 'pct' => $pct, 'lim' => $lim, 'desp' => $desp];
         });
 
         $fmtDate = fn ($d) => $d ? Carbon::parse($d)->format('d/m/Y') : '';
@@ -137,6 +138,7 @@ class WelcomeController extends Controller
                 return [
                     'id' => $m->id,
                     'nome' => $m->nome,
+                    'icone' => $m->icone,
                     'percent' => $percent,
                     'valor' => (float) $m->valor,
                     'investido' => $investido,

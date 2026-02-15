@@ -10,7 +10,7 @@ import metas from "@/routes/metas";
 import fontesRendaRoutes from "@/routes/fontes-renda";
 import categoriasRoutes from "@/routes/categorias";
 import formasPagamentoRoutes from "@/routes/formas-pagamento";
-import { Gem, TrendingUp, Home, Briefcase, BarChart3, Wrench, GraduationCap, CreditCard, ShoppingCart, HeartPulse, Car, Hammer, Gamepad2, TrendingDown, UtensilsCrossed, ShoppingBag, Banknote, FileText, Zap } from "lucide-react";
+import { IconPreview } from "@/components/icon-picker";
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@/components/ui/combobox";
 import { Spinner } from "@/components/ui/spinner";
 import DespesaVariavelModal, { type DespesaFormData } from "@/components/despesa-variavel-modal";
@@ -29,10 +29,10 @@ interface DespesaFixa { id: number; descricao: string; categoria: string; valor:
 interface DespesaVariavel { id: number; descricao: string; categoria: string; valor: number; data: string; balanco: string; forma: string }
 interface Divida { id: number; descricao: string; destino: string; valor: number; vencimento: string; status: string; balanco: string }
 interface Investimento { id: number; produto: string; empresa: string; valor: number; quantidade: number; valorTotal: number; tipoAtivo: string; provento: number; frequencia: string; data: string; balanco: string }
-interface Meta { id: number; nome: string; percent: number; valor: number; investido: number; faltante: number }
-interface FonteRenda { id: number; nome: string; percent: number; metaAnual: number; receitaAnual: number }
-interface Categoria { id: number; nome: string; pct: number; lim: number | null; desp: number }
-interface FormaPagamento { id: number; nome: string; pct: number; lim: number; desp: number }
+interface Meta { id: number; nome: string; icone: string | null; percent: number; valor: number; investido: number; faltante: number }
+interface FonteRenda { id: number; nome: string; icone: string | null; percent: number; metaAnual: number; receitaAnual: number }
+interface Categoria { id: number; nome: string; icone: string | null; pct: number; lim: number | null; desp: number }
+interface FormaPagamento { id: number; nome: string; icone: string | null; pct: number; lim: number; desp: number }
 
 interface PageProps {
     auth: { user: { name: string } };
@@ -60,39 +60,6 @@ interface Column<T = any> {
     render?: (row: T) => ReactNode;
 }
 interface FooterItem { label: string; value: string | number }
-
-/* ── ICON MAPS ─────────────────────────────────────────────────────────────── */
-
-const metaIcons: Record<string, ReactNode> = {
-    "Casamento": <Gem className="size-5 text-zinc-700"/>,
-    "Investimentos": <TrendingUp className="size-5 text-zinc-700"/>,
-    "Imóvel": <Home className="size-5 text-zinc-700"/>,
-};
-const fonteIcons: Record<string, ReactNode> = {
-    "Trabalho": <Briefcase className="size-5 text-zinc-700"/>,
-    "Investimentos": <BarChart3 className="size-5 text-zinc-700"/>,
-    "Manutenções": <Wrench className="size-5 text-zinc-700"/>,
-};
-const categIcons: Record<string, ReactNode> = {
-    "Casa": <Home className="size-4 text-zinc-600"/>,
-    "Profissional": <Briefcase className="size-4 text-zinc-600"/>,
-    "Educação": <GraduationCap className="size-4 text-zinc-600"/>,
-    "Assinaturas": <CreditCard className="size-4 text-zinc-600"/>,
-    "Mercado": <ShoppingCart className="size-4 text-zinc-600"/>,
-    "Farmácia e Saúde": <HeartPulse className="size-4 text-zinc-600"/>,
-    "Transporte": <Car className="size-4 text-zinc-600"/>,
-    "Utilidades": <Hammer className="size-4 text-zinc-600"/>,
-    "Entretenimento": <Gamepad2 className="size-4 text-zinc-600"/>,
-    "Juros e Taxas": <TrendingDown className="size-4 text-zinc-600"/>,
-    "Alimentação": <UtensilsCrossed className="size-4 text-zinc-600"/>,
-    "Shopping": <ShoppingBag className="size-4 text-zinc-600"/>,
-};
-const formaIcons: Record<string, ReactNode> = {
-    "Dinheiro": <Banknote className="size-4 text-zinc-600"/>,
-    "Boleto": <FileText className="size-4 text-zinc-600"/>,
-    "Pix": <Zap className="size-4 text-zinc-600"/>,
-};
-const defaultFormaIcon = <CreditCard className="size-4 text-zinc-600"/>;
 
 /* ── HELPERS ───────────────────────────────────────────────────────────────── */
 
@@ -248,18 +215,18 @@ export default function FinancasDashboard() {
 
     const submitFonte=(data: ConfigFormData)=>{
         setLoading(true);
-        if(editingFonte) router.put(fontesRendaRoutes.update(editingFonte.id).url, { nome: data.nome, meta_anual: data.valor }, rOpts);
-        else router.post(fontesRendaRoutes.store().url, { nome: data.nome, meta_anual: data.valor }, rOpts);
+        if(editingFonte) router.put(fontesRendaRoutes.update(editingFonte.id).url, { nome: data.nome, icone: data.icone, meta_anual: data.valor }, rOpts);
+        else router.post(fontesRendaRoutes.store().url, { nome: data.nome, icone: data.icone, meta_anual: data.valor }, rOpts);
     };
     const submitCategoria=(data: ConfigFormData)=>{
         setLoading(true);
-        if(editingCategoria) router.put(categoriasRoutes.update(editingCategoria.id).url, { nome: data.nome, limite_anual: data.valor }, rOpts);
-        else router.post(categoriasRoutes.store().url, { nome: data.nome, limite_anual: data.valor }, rOpts);
+        if(editingCategoria) router.put(categoriasRoutes.update(editingCategoria.id).url, { nome: data.nome, icone: data.icone, limite_anual: data.valor }, rOpts);
+        else router.post(categoriasRoutes.store().url, { nome: data.nome, icone: data.icone, limite_anual: data.valor }, rOpts);
     };
     const submitForma=(data: ConfigFormData)=>{
         setLoading(true);
-        if(editingForma) router.put(formasPagamentoRoutes.update(editingForma.id).url, { nome: data.nome, limite_anual: data.valor }, rOpts);
-        else router.post(formasPagamentoRoutes.store().url, { nome: data.nome, limite_anual: data.valor }, rOpts);
+        if(editingForma) router.put(formasPagamentoRoutes.update(editingForma.id).url, { nome: data.nome, icone: data.icone, limite_anual: data.valor }, rOpts);
+        else router.post(formasPagamentoRoutes.store().url, { nome: data.nome, icone: data.icone, limite_anual: data.valor }, rOpts);
     };
 
     const requestDelete = (url: string) => {
@@ -437,7 +404,7 @@ export default function FinancasDashboard() {
                         {dataMetas.map(m=><div key={m.id} onClick={()=>{setEditingMeta(m);setModalMeta(true);}} className="cursor-pointer rounded-xl border border-zinc-200 bg-white p-6 hover:shadow-md hover:border-zinc-300 transition-all">
                             <div className="flex items-center gap-4 mb-5">
                                 <div className="relative"><CP p={m.percent} size={56} sw={4}/><span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-zinc-700">{m.percent}%</span></div>
-                                <h3 className="font-semibold text-zinc-900 flex items-center gap-2">{metaIcons[m.nome] || <Gem className="size-5 text-zinc-700"/>}{m.nome}</h3>
+                                <h3 className="font-semibold text-zinc-900 flex items-center gap-2"><IconPreview name={m.icone || "Gem"} className="size-5 text-zinc-700"/>{m.nome}</h3>
                             </div>
                             <div className="space-y-2.5">
                                 <div className="flex justify-between text-sm"><span className="text-zinc-400">Valor</span><span className="font-mono font-semibold text-zinc-900">{fmt(m.valor)}</span></div>
@@ -454,7 +421,7 @@ export default function FinancasDashboard() {
                         {dataFontes.map(f=><div key={f.id} onClick={()=>{setEditingFonte(f);setModalFonte(true);}} className="cursor-pointer rounded-xl border border-zinc-200 bg-white p-6 hover:shadow-md hover:border-zinc-300 transition-all">
                             <div className="flex items-center gap-4 mb-5">
                                 <div className="relative"><CP p={f.percent} size={56} sw={4}/><span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-zinc-700">{f.percent}%</span></div>
-                                <h3 className="font-semibold text-zinc-900 flex items-center gap-2">{fonteIcons[f.nome] || <Briefcase className="size-5 text-zinc-700"/>}{f.nome}</h3>
+                                <h3 className="font-semibold text-zinc-900 flex items-center gap-2"><IconPreview name={f.icone || "Briefcase"} className="size-5 text-zinc-700"/>{f.nome}</h3>
                             </div>
                             <div className="space-y-2.5">
                                 <div className="flex justify-between text-sm"><span className="text-zinc-400">Meta Anual</span><span className="font-mono font-semibold text-zinc-900">{fmt(f.metaAnual)}</span></div>
@@ -470,7 +437,7 @@ export default function FinancasDashboard() {
                         {dataCategs.map(c=><div key={c.id} onClick={()=>{setEditingCategoria(c);setModalCategoria(true);}} className="cursor-pointer rounded-xl border border-zinc-200 bg-white p-5 hover:shadow-md hover:border-zinc-300 transition-all">
                             <div className="flex items-center gap-3 mb-3">
                                 <div className="relative"><CP p={c.pct} size={40} sw={3}/><span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-zinc-500">{c.pct>0?`${c.pct}%`:"—"}</span></div>
-                                <h3 className="font-semibold text-zinc-900 text-sm flex items-center gap-1.5">{categIcons[c.nome] || <ShoppingBag className="size-4 text-zinc-600"/>}{c.nome}</h3>
+                                <h3 className="font-semibold text-zinc-900 text-sm flex items-center gap-1.5"><IconPreview name={c.icone || "ShoppingBag"} className="size-4 text-zinc-600"/>{c.nome}</h3>
                             </div>
                             <div className="space-y-1.5">
                                 <div className="flex justify-between text-xs"><span className="text-zinc-400">Limite Anual</span><span className="font-mono text-zinc-600">{c.lim?fmt(c.lim):"—"}</span></div>
@@ -486,7 +453,7 @@ export default function FinancasDashboard() {
                         {dataFormas.map(f=><div key={f.id} onClick={()=>{setEditingForma(f);setModalForma(true);}} className="cursor-pointer rounded-xl border border-zinc-200 bg-white p-5 hover:shadow-md hover:border-zinc-300 transition-all">
                             <div className="flex items-center gap-3 mb-3">
                                 <div className="relative"><CP p={f.pct} size={40} sw={3}/><span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-zinc-500">{f.pct}%</span></div>
-                                <h3 className="font-semibold text-zinc-900 text-sm flex items-center gap-1.5">{formaIcons[f.nome] || defaultFormaIcon}{f.nome}</h3>
+                                <h3 className="font-semibold text-zinc-900 text-sm flex items-center gap-1.5"><IconPreview name={f.icone || "CreditCard"} className="size-4 text-zinc-600"/>{f.nome}</h3>
                             </div>
                             <div className="space-y-1.5">
                                 <div className="flex justify-between text-xs"><span className="text-zinc-400">Limite Anual</span><span className="font-mono text-zinc-600">{fmt(f.lim)}</span></div>
@@ -518,20 +485,20 @@ export default function FinancasDashboard() {
                 initialData={editingInvest?{produto:editingInvest.produto,empresa:editingInvest.empresa,valor:String(editingInvest.valor),quantidade:String(editingInvest.quantidade),tipoAtivo:editingInvest.tipoAtivo,provento:String(editingInvest.provento),frequencia:editingInvest.frequencia,data:editingInvest.data}:undefined}
                 onDelete={editingInvest?requestDeleteInvest:undefined}/>
             <MetaModal open={modalMeta} onClose={closeAll} onSubmit={submitMeta} loading={loading}
-                initialData={editingMeta?{nome:editingMeta.nome,valor:String(editingMeta.valor)}:undefined}
+                initialData={editingMeta?{nome:editingMeta.nome,icone:editingMeta.icone||"Gem",valor:String(editingMeta.valor)}:undefined}
                 onDelete={editingMeta?requestDeleteMeta:undefined}/>
 
             <ConfigModal open={modalFonte} onClose={closeAll} onSubmit={submitFonte} loading={loading}
-                title="Fonte de Renda" valorLabel="Meta Anual (R$)" valorPlaceholder="0,00"
-                initialData={editingFonte?{nome:editingFonte.nome,valor:String(editingFonte.metaAnual||"")}:undefined}
+                title="Fonte de Renda" valorLabel="Meta Anual (R$)" valorPlaceholder="0,00" defaultIcon="Briefcase"
+                initialData={editingFonte?{nome:editingFonte.nome,icone:editingFonte.icone||"Briefcase",valor:String(editingFonte.metaAnual||"")}:undefined}
                 onDelete={editingFonte?requestDeleteFonte:undefined}/>
             <ConfigModal open={modalCategoria} onClose={closeAll} onSubmit={submitCategoria} loading={loading}
-                title="Categoria" valorLabel="Limite Anual (R$)" valorPlaceholder="0,00"
-                initialData={editingCategoria?{nome:editingCategoria.nome,valor:editingCategoria.lim!=null?String(editingCategoria.lim):""}:undefined}
+                title="Categoria" valorLabel="Limite Anual (R$)" valorPlaceholder="0,00" defaultIcon="ShoppingBag"
+                initialData={editingCategoria?{nome:editingCategoria.nome,icone:editingCategoria.icone||"ShoppingBag",valor:editingCategoria.lim!=null?String(editingCategoria.lim):""}:undefined}
                 onDelete={editingCategoria?requestDeleteCategoria:undefined}/>
             <ConfigModal open={modalForma} onClose={closeAll} onSubmit={submitForma} loading={loading}
-                title="Forma de Pagamento" valorLabel="Limite Anual (R$)" valorPlaceholder="0,00"
-                initialData={editingForma?{nome:editingForma.nome,valor:String(editingForma.lim||"")}:undefined}
+                title="Forma de Pagamento" valorLabel="Limite Anual (R$)" valorPlaceholder="0,00" defaultIcon="CreditCard"
+                initialData={editingForma?{nome:editingForma.nome,icone:editingForma.icone||"CreditCard",valor:String(editingForma.lim||"")}:undefined}
                 onDelete={editingForma?requestDeleteForma:undefined}/>
 
             {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO */}
