@@ -1,528 +1,303 @@
-import { type ReactNode, useState } from "react";
-import { Link, usePage, router } from "@inertiajs/react";
-import { logout } from "@/routes";
-import ganhos from "@/routes/ganhos";
-import despesasFixas from "@/routes/despesas-fixas";
-import despesasVariaveis from "@/routes/despesas-variaveis";
-import dividas from "@/routes/dividas";
-import investimentos from "@/routes/investimentos";
-import metas from "@/routes/metas";
-import fontesRendaRoutes from "@/routes/fontes-renda";
-import categoriasRoutes from "@/routes/categorias";
-import formasPagamentoRoutes from "@/routes/formas-pagamento";
-import { IconPreview } from "@/components/icon-picker";
-import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@/components/ui/combobox";
-import { Spinner } from "@/components/ui/spinner";
-import DespesaVariavelModal, { type DespesaFormData } from "@/components/despesa-variavel-modal";
-import GanhoModal, { type GanhoFormData } from "@/components/ganho-modal";
-import DespesaFixaModal, { type DespesaFixaFormData } from "@/components/despesa-fixa-modal";
-import DividaModal, { type DividaFormData } from "@/components/divida-modal";
-import InvestimentoModal, { type InvestimentoFormData, type MetaInvestFormData } from "@/components/investimento-modal";
-import MetaModal, { type MetaFormData } from "@/components/meta-modal";
-import ConfigModal, { type ConfigFormData } from "@/components/config-modal";
+import { Head, Link } from "@inertiajs/react";
+import { ArrowRight, Check, TrendingUp, Target, Wallet, CreditCard, PieChart, ShieldCheck } from "lucide-react";
+import { login, register } from "@/routes";
 
-/* ── TYPES ─────────────────────────────────────────────────────────────────── */
+/* ── Mini dashboard mockup ──────────────────────────────────────────────── */
 
-interface BalancoMensal { mes: string; receita: number; despesa: number }
-interface Ganho { id: number; descricao: string; fonte: string; data: string; valor: number; balanco: string }
-interface DespesaFixa { id: number; descricao: string; categoria: string; valor: number; vencimento: string; status: string; dataPgto: string; forma: string; balanco: string }
-interface DespesaVariavel { id: number; descricao: string; categoria: string; valor: number; data: string; balanco: string; forma: string }
-interface Divida { id: number; descricao: string; destino: string; valor: number; vencimento: string; status: string; balanco: string }
-interface Investimento { id: number; produto: string; empresa: string; valor: number; quantidade: number; valorTotal: number; tipoAtivo: string; provento: number; frequencia: string; data: string; balanco: string }
-interface Meta { id: number; nome: string; icone: string | null; percent: number; valor: number; investido: number; faltante: number }
-interface FonteRenda { id: number; nome: string; icone: string | null; percent: number; metaAnual: number; receitaAnual: number }
-interface Categoria { id: number; nome: string; icone: string | null; pct: number; lim: number | null; desp: number }
-interface FormaPagamento { id: number; nome: string; icone: string | null; pct: number; lim: number; desp: number }
-
-interface PageProps {
-    auth: { user: { name: string } };
-    ano: number;
-    balancoMensal: BalancoMensal[];
-    ganhos: Ganho[];
-    fixas: DespesaFixa[];
-    variaveis: DespesaVariavel[];
-    dividas: Divida[];
-    investimentos: Investimento[];
-    metas: Meta[];
-    fontes: FonteRenda[];
-    categorias: Categoria[];
-    formas: FormaPagamento[];
-    configFontes: string[];
-    configCategorias: string[];
-    configFormas: string[];
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-interface Column<T = any> {
-    key: string;
-    label: string;
-    align?: "right";
-    render?: (row: T) => ReactNode;
-}
-interface FooterItem { label: string; value: string | number }
-
-/* ── HELPERS ───────────────────────────────────────────────────────────────── */
-
-const MONTHS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"] as const;
-const FULL = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"] as const;
-const fmt = (v: number): string => v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
-const toFull = (a: string): string => FULL[MONTHS.indexOf(a as typeof MONTHS[number])] || a;
-const mmYYYYtoFull = (b: string): string => { const [mm] = b.split("/"); return FULL[parseInt(mm, 10) - 1] || b; };
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const byMonth = <T extends Record<string, any>>(d: T[], f: keyof T, a: string): T[] => d.filter(r => r[f] === toFull(a));
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const byMonthMMYYYY = <T extends Record<string, any>>(d: T[], f: keyof T, a: string): T[] => d.filter(r => mmYYYYtoFull(String(r[f])) === toFull(a));
-
-/* ── UI ───────────────────────────────────────────────────────────────────── */
-
-const CP = ({p,size=48,sw=4}: {p: number; size?: number; sw?: number}) => {
-    const r=(size-sw)/2,c=2*Math.PI*r,mn=Math.min(p,100),o=c-(mn/100)*c;
-    const cl=p>100?"#ef4444":p>75?"#f59e0b":"#18181b";
-    return (<svg width={size} height={size} className="transform -rotate-90">
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#e4e4e7" strokeWidth={sw}/>
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={cl} strokeWidth={sw} strokeDasharray={c} strokeDashoffset={o} strokeLinecap="round" style={{transition:"stroke-dashoffset .6s ease"}}/>
-    </svg>);
-};
-
-const LP = ({p}: {p: number}) => {
-    const cl=p>90?"#ef4444":p>60?"#f59e0b":"#18181b";
-    return (<div className="w-full h-1.5 bg-zinc-100 rounded-full overflow-hidden">
-        <div className="h-full rounded-full transition-all duration-500" style={{width:`${Math.min(p,100)}%`,backgroundColor:cl}}/>
-    </div>);
-};
-
-type BadgeVariant = "default" | "success" | "danger" | "warning";
-const B = ({children,v="default"}: {children: ReactNode; v?: BadgeVariant}) => {
-    const s: Record<BadgeVariant, string> = {default:"bg-zinc-100 text-zinc-600",success:"bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20",danger:"bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/10",warning:"bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20"};
-    return <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${s[v]}`}>{children}</span>;
-};
-
-const SB = ({s}: {s: string}) => s==="Pago"?<B v="success">● Pago</B>:<B v="danger">● Pendente</B>;
-
-const TabsNav = ({tabs,active,onChange}: {tabs: readonly string[]; active: string; onChange: (tab: string) => void}) => (
-    <div className="flex items-center gap-1 overflow-x-auto pb-1" style={{scrollbarWidth:"none"}}>
-        {tabs.map(t=><button key={t} onClick={()=>onChange(t)} className={`whitespace-nowrap px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${active===t?"bg-zinc-900 text-white shadow-sm":"text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100"}`}>{t}</button>)}
-    </div>
-);
-const MT = ({a,o}: {a: string; o: (tab: string) => void}) => <TabsNav tabs={MONTHS} active={a} onChange={o}/>;
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const Tbl = ({cols,data,footer,onRowClick}: {cols: Column[]; data: Record<string, any>[]; footer?: FooterItem[]; onRowClick?: (row: Record<string, any>) => void}) => (
-    <div className="rounded-xl border border-zinc-200 overflow-hidden bg-white shadow-sm">
-        <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-                <thead><tr className="border-b border-zinc-100 bg-zinc-50/70">
-                    {cols.map(c=><th key={c.key} className={`px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider ${c.align==="right"?"text-right":""}`}>{c.label}</th>)}
-                </tr></thead>
-                <tbody className="divide-y divide-zinc-50">
-                {data.length===0?<tr><td colSpan={cols.length} className="px-4 py-10 text-center text-sm text-zinc-400">Nenhum registro neste mês</td></tr>
-                    :data.map((row,i)=><tr key={row.id||i} onClick={()=>onRowClick?.(row)} className={`hover:bg-zinc-50/60 transition-colors ${onRowClick?"cursor-pointer":""}`}>
-                        {cols.map(c=><td key={c.key} className={`px-4 py-3 ${c.align==="right"?"text-right":""}`}>{c.render?c.render(row):row[c.key]}</td>)}
-                    </tr>)}
-                </tbody>
-            </table>
-        </div>
-        {footer&&<div className="border-t border-zinc-100 px-4 py-2.5 flex flex-wrap gap-6 text-xs text-zinc-400 bg-zinc-50/40">
-            {footer.map((f,i)=><span key={i}><span className="uppercase tracking-wider">{f.label}</span>{" "}<span className="text-zinc-700 font-semibold">{f.value}</span></span>)}
-        </div>}
-    </div>
-);
-
-const SH = ({title,onAdd}: {title: string; onAdd?: () => void}) => (
-    <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-zinc-900 tracking-tight">{title}</h2>
-        {onAdd&&<button onClick={onAdd} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 active:bg-zinc-700 transition-colors">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg> Novo
-        </button>}
-    </div>
-);
-
-/* ── APP ──────────────────────────────────────────────────────────────────── */
-
-const currentMonth = MONTHS[new Date().getMonth()];
-const currentYear = new Date().getFullYear();
-const yearOptions = Array.from({length: 5}, (_, i) => String(currentYear - 2 + i));
-
-export default function FinancasDashboard() {
-    const props = usePage<PageProps>().props;
-    const { auth, ano, balancoMensal, ganhos: dataGanhos, fixas: dataFixas, variaveis: dataVar, dividas: dataDividas, investimentos: dataInvest, metas: dataMetas, fontes: dataFontes, categorias: dataCategs, formas: dataFormas, configFontes, configCategorias, configFormas } = props;
-
-    const curQ = Math.floor(new Date().getMonth() / 4);
-    const [qTab, setQTab] = useState(["1º Quadrimestre","2º Quadrimestre","3º Quadrimestre"][curQ]);
-    const [gM,setGM]=useState(currentMonth);
-    const [fM,setFM]=useState(currentMonth);
-    const [vM,setVM]=useState(currentMonth);
-    const [dM,setDM]=useState(currentMonth);
-    const [iM,setIM]=useState(currentMonth);
-    const [modal,setModal]=useState(false);
-    const [modalGanho,setModalGanho]=useState(false);
-    const [modalFixa,setModalFixa]=useState(false);
-    const [modalDivida,setModalDivida]=useState(false);
-    const [modalInvest,setModalInvest]=useState(false);
-    const [editingDV,setEditingDV]=useState<DespesaVariavel|null>(null);
-    const [editingGanho,setEditingGanho]=useState<Ganho|null>(null);
-    const [editingFixa,setEditingFixa]=useState<DespesaFixa|null>(null);
-    const [editingDivida,setEditingDivida]=useState<Divida|null>(null);
-    const [editingInvest,setEditingInvest]=useState<Investimento|null>(null);
-    const [modalMeta,setModalMeta]=useState(false);
-    const [editingMeta,setEditingMeta]=useState<Meta|null>(null);
-    const [modalFonte,setModalFonte]=useState(false);
-    const [editingFonte,setEditingFonte]=useState<FonteRenda|null>(null);
-    const [modalCategoria,setModalCategoria]=useState(false);
-    const [editingCategoria,setEditingCategoria]=useState<Categoria|null>(null);
-    const [modalForma,setModalForma]=useState(false);
-    const [editingForma,setEditingForma]=useState<FormaPagamento|null>(null);
-
-    const [loading, setLoading] = useState(false);
-    const [deleteConfirm, setDeleteConfirm] = useState<{ action: () => void } | null>(null);
-    const [deleting, setDeleting] = useState(false);
-
-    const closeAll=()=>{setModal(false);setModalGanho(false);setModalFixa(false);setModalDivida(false);setModalInvest(false);setModalMeta(false);setModalFonte(false);setModalCategoria(false);setModalForma(false);setEditingDV(null);setEditingGanho(null);setEditingFixa(null);setEditingDivida(null);setEditingInvest(null);setEditingMeta(null);setEditingFonte(null);setEditingCategoria(null);setEditingForma(null);};
-
-    const rOpts = { preserveScroll: true, preserveState: true, onSuccess: closeAll, onFinish: () => setLoading(false) };
-
-    const submitDV=(data: DespesaFormData)=>{
-        setLoading(true);
-        if(editingDV) router.put(despesasVariaveis.update(editingDV.id).url, data, rOpts);
-        else router.post(despesasVariaveis.store().url, data, rOpts);
-    };
-    const submitGanho=(data: GanhoFormData)=>{
-        setLoading(true);
-        if(editingGanho) router.put(ganhos.update(editingGanho.id).url, data, rOpts);
-        else router.post(ganhos.store().url, data, rOpts);
-    };
-    const submitFixa=(data: DespesaFixaFormData)=>{
-        setLoading(true);
-        if(editingFixa) router.put(despesasFixas.update(editingFixa.id).url, data, rOpts);
-        else router.post(despesasFixas.store().url, data, rOpts);
-    };
-    const submitDivida=(data: DividaFormData)=>{
-        setLoading(true);
-        if(editingDivida) router.put(dividas.update(editingDivida.id).url, data, rOpts);
-        else router.post(dividas.store().url, data, rOpts);
-    };
-    const submitInvest=(data: InvestimentoFormData)=>{
-        setLoading(true);
-        if(editingInvest) router.put(investimentos.update(editingInvest.id).url, data, rOpts);
-        else router.post(investimentos.store().url, data, rOpts);
-    };
-    const submitMeta=(data: MetaFormData)=>{
-        setLoading(true);
-        if(editingMeta) router.put(metas.update(editingMeta.id).url, { ...data }, rOpts);
-        else router.post(metas.store().url, { ...data }, rOpts);
-    };
-    const submitMetaInvest=(data: MetaInvestFormData)=>{
-        setLoading(true);
-        router.post(metas.investir(data.metaId).url, { valor: data.valor, data: data.data }, rOpts);
-    };
-
-    const submitFonte=(data: ConfigFormData)=>{
-        setLoading(true);
-        if(editingFonte) router.put(fontesRendaRoutes.update(editingFonte.id).url, { nome: data.nome, icone: data.icone, meta_anual: data.valor }, rOpts);
-        else router.post(fontesRendaRoutes.store().url, { nome: data.nome, icone: data.icone, meta_anual: data.valor }, rOpts);
-    };
-    const submitCategoria=(data: ConfigFormData)=>{
-        setLoading(true);
-        if(editingCategoria) router.put(categoriasRoutes.update(editingCategoria.id).url, { nome: data.nome, icone: data.icone, limite_anual: data.valor }, rOpts);
-        else router.post(categoriasRoutes.store().url, { nome: data.nome, icone: data.icone, limite_anual: data.valor }, rOpts);
-    };
-    const submitForma=(data: ConfigFormData)=>{
-        setLoading(true);
-        if(editingForma) router.put(formasPagamentoRoutes.update(editingForma.id).url, { nome: data.nome, icone: data.icone, limite_anual: data.valor }, rOpts);
-        else router.post(formasPagamentoRoutes.store().url, { nome: data.nome, icone: data.icone, limite_anual: data.valor }, rOpts);
-    };
-
-    const requestDelete = (url: string) => {
-        closeAll();
-        setDeleteConfirm({
-            action: () => {
-                setDeleting(true);
-                router.delete(url, {
-                    preserveScroll: true,
-                    preserveState: true,
-                    onSuccess: () => setDeleteConfirm(null),
-                    onFinish: () => setDeleting(false),
-                });
-            },
-        });
-    };
-
-    const requestDeleteDV=()=>{if(editingDV) requestDelete(despesasVariaveis.destroy(editingDV.id).url);};
-    const requestDeleteGanho=()=>{if(editingGanho) requestDelete(ganhos.destroy(editingGanho.id).url);};
-    const requestDeleteFixa=()=>{if(editingFixa) requestDelete(despesasFixas.destroy(editingFixa.id).url);};
-    const requestDeleteDivida=()=>{if(editingDivida) requestDelete(dividas.destroy(editingDivida.id).url);};
-    const requestDeleteInvest=()=>{if(editingInvest) requestDelete(investimentos.destroy(editingInvest.id).url);};
-    const requestDeleteMeta=()=>{if(editingMeta) requestDelete(metas.destroy(editingMeta.id).url);};
-    const requestDeleteFonte=()=>{if(editingFonte) requestDelete(fontesRendaRoutes.destroy(editingFonte.id).url);};
-    const requestDeleteCategoria=()=>{if(editingCategoria) requestDelete(categoriasRoutes.destroy(editingCategoria.id).url);};
-    const requestDeleteForma=()=>{if(editingForma) requestDelete(formasPagamentoRoutes.destroy(editingForma.id).url);};
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const openEditGanho=(row: Record<string,any>)=>{const r=row as Ganho;setEditingGanho(r);setModalGanho(true);};
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const openEditFixa=(row: Record<string,any>)=>{const r=row as DespesaFixa;setEditingFixa(r);setModalFixa(true);};
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const openEditDV=(row: Record<string,any>)=>{const r=row as DespesaVariavel;setEditingDV(r);setModal(true);};
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const openEditDivida=(row: Record<string,any>)=>{const r=row as Divida;setEditingDivida(r);setModalDivida(true);};
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const openEditInvest=(row: Record<string,any>)=>{const r=row as Investimento;setEditingInvest(r);setModalInvest(true);};
-
-    const changeAno = (newAno: number) => {
-        router.visit('/', { data: { ano: newAno }, preserveState: true });
-    };
-
-    const qTabs=["1º Quadrimestre","2º Quadrimestre","3º Quadrimestre"];
-    const vis=balancoMensal.slice(qTabs.indexOf(qTab)*4,qTabs.indexOf(qTab)*4+4);
-    const gF=byMonth(dataGanhos,"balanco",gM);
-    const fF=byMonth(dataFixas,"balanco",fM);
-    const vF=byMonthMMYYYY(dataVar,"balanco",vM);
-    const dF=byMonth(dataDividas,"balanco",dM);
-    const iF=byMonth(dataInvest,"balanco",iM);
-    const tR=balancoMensal.reduce((s,m)=>s+m.receita,0);
-    const tD=balancoMensal.reduce((s,m)=>s+m.despesa,0);
-    const tB=tR-tD;
-
+function DashboardPreview() {
+    const bars = [
+        { label: "Jan", r: 62, d: 45 }, { label: "Fev", r: 58, d: 52 },
+        { label: "Mar", r: 71, d: 38 }, { label: "Abr", r: 65, d: 60 },
+        { label: "Mai", r: 80, d: 42 }, { label: "Jun", r: 73, d: 55 },
+    ];
     return (
-        <div className="min-h-screen bg-zinc-50/50" style={{fontFamily:"'Inter',-apple-system,BlinkMacSystemFont,sans-serif"}}>
-            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+        <div className="rounded-2xl border border-zinc-200/60 bg-white shadow-2xl shadow-zinc-900/[0.08] overflow-hidden">
+            {/* Fake header */}
+            <div className="flex items-center gap-2 px-5 py-3 border-b border-zinc-100">
+                <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
+                <div className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                <span className="ml-3 text-[11px] text-zinc-400 font-medium">Finanças — Balanço Mensal</span>
+            </div>
+            <div className="p-5">
+                {/* Summary cards */}
+                <div className="grid grid-cols-3 gap-3 mb-5">
+                    <div className="rounded-lg bg-emerald-50 border border-emerald-100 p-3">
+                        <div className="text-[10px] text-emerald-600 font-medium mb-1">Receitas</div>
+                        <div className="text-base font-bold text-emerald-700 font-mono">R$ 8.420</div>
+                    </div>
+                    <div className="rounded-lg bg-red-50 border border-red-100 p-3">
+                        <div className="text-[10px] text-red-500 font-medium mb-1">Despesas</div>
+                        <div className="text-base font-bold text-red-600 font-mono">R$ 5.230</div>
+                    </div>
+                    <div className="rounded-lg bg-zinc-50 border border-zinc-200 p-3">
+                        <div className="text-[10px] text-zinc-500 font-medium mb-1">Saldo</div>
+                        <div className="text-base font-bold text-zinc-900 font-mono">R$ 3.190</div>
+                    </div>
+                </div>
+                {/* Chart bars */}
+                <div className="flex items-end gap-2 h-28">
+                    {bars.map(b => (
+                        <div key={b.label} className="flex-1 flex flex-col items-center gap-1">
+                            <div className="w-full flex gap-0.5">
+                                <div className="flex-1 rounded-t bg-emerald-400/80" style={{ height: `${b.r}px` }} />
+                                <div className="flex-1 rounded-t bg-red-300/70" style={{ height: `${b.d}px` }} />
+                            </div>
+                            <span className="text-[9px] text-zinc-400">{b.label}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+}
 
+/* ── Circular progress (for goals) ──────────────────────────────────────── */
+
+function Ring({ pct, color, size = 48, stroke = 4 }: { pct: number; color: string; size?: number; stroke?: number }) {
+    const r = (size - stroke) / 2;
+    const c = 2 * Math.PI * r;
+    return (
+        <svg width={size} height={size} className="-rotate-90">
+            <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="currentColor" strokeWidth={stroke} className="text-zinc-100" />
+            <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeDasharray={c} strokeDashoffset={c * (1 - pct / 100)} strokeLinecap="round" />
+        </svg>
+    );
+}
+
+/* ── Main ───────────────────────────────────────────────────────────────── */
+
+export default function Welcome() {
+    return (
+        <div className="min-h-screen bg-white" style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }}>
+            <Head title="Controle Financeiro Pessoal" />
+            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+            {/* ── HEADER ─────────────────────────────────────────────────── */}
             <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-lg border-b border-zinc-200/80">
-                <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+                <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg bg-zinc-900 flex items-center justify-center text-white text-sm font-bold">F</div>
-                        <div><h1 className="text-lg font-bold text-zinc-900 tracking-tight leading-tight">Finanças</h1><p className="text-xs text-zinc-400">Controle financeiro · {ano}</p></div>
+                        <span className="text-lg font-bold text-zinc-900 tracking-tight">Finanças</span>
                     </div>
-                    <div className="flex items-center gap-5">
-                        <div className="hidden md:flex items-center gap-5">
-                            <div className="text-right"><p className="text-[11px] text-zinc-400 uppercase tracking-wider">Receita</p><p className="text-sm font-bold text-emerald-600">{fmt(tR)}</p></div>
-                            <div className="text-right"><p className="text-[11px] text-zinc-400 uppercase tracking-wider">Despesa</p><p className="text-sm font-bold text-red-500">{fmt(tD)}</p></div>
-                            <div className="h-8 w-px bg-zinc-200"/>
-                            <div className="text-right"><p className="text-[11px] text-zinc-400 uppercase tracking-wider">Balanço</p><p className={`text-sm font-bold ${tB>=0?"text-emerald-600":"text-red-600"}`}>{fmt(tB)}</p></div>
-                        </div>
-                        <div className="h-8 w-px bg-zinc-200 hidden md:block"/>
-                        <Combobox items={yearOptions} value={String(ano)} onValueChange={val => { if(val) changeAno(Number(val)); }}>
-                            <ComboboxInput placeholder="Ano" className="w-23 h-8 text-sm font-medium" />
-                            <ComboboxContent>
-                                <ComboboxEmpty>Nenhum ano.</ComboboxEmpty>
-                                <ComboboxList>
-                                    {item => <ComboboxItem key={item} value={item}>{item}</ComboboxItem>}
-                                </ComboboxList>
-                            </ComboboxContent>
-                        </Combobox>
-                        {auth.user && <>
-                            <div className="h-8 w-px bg-zinc-200"/>
-                            <div className="flex items-center gap-3">
-                                <span className="text-sm font-medium text-zinc-700">{auth.user.name}</span>
-                                <Link href={logout().url} method="post" as="button" className="text-sm text-zinc-400 hover:text-zinc-700 transition-colors">Sair</Link>
-                            </div>
-                        </>}
+                    <div className="flex items-center gap-3">
+                        <Link href={login().url} className="text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors px-3 py-2">
+                            Entrar
+                        </Link>
+                        <Link href={register().url} className="inline-flex items-center h-9 px-4 rounded-md text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors">
+                            Começar agora
+                        </Link>
                     </div>
                 </div>
             </header>
 
-            <div className="max-w-7xl mx-auto px-6 py-8 space-y-10">
+            {/* ── HERO ───────────────────────────────────────────────────── */}
+            <section className="relative overflow-hidden">
+                {/* Background accent */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-gradient-to-b from-emerald-50/60 via-transparent to-transparent rounded-full blur-3xl pointer-events-none" />
 
-                {/* BALANÇO MENSAL */}
-                <section><SH title="Balanço Mensal"/><TabsNav tabs={qTabs} active={qTab} onChange={setQTab}/>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
-                        {vis.map(m=>{const p=Math.round((m.despesa/m.receita)*100)||0,b=m.receita-m.despesa;return(
-                            <div key={m.mes} className="rounded-xl border border-zinc-200 bg-white p-5 hover:shadow-md hover:border-zinc-300 transition-all">
-                                <div className="flex items-center justify-between mb-4"><h3 className="font-semibold text-zinc-900">{m.mes}</h3><span className={`text-xs font-mono font-semibold px-2 py-0.5 rounded-md ${p>90?"bg-red-50 text-red-600":"bg-zinc-100 text-zinc-600"}`}>{p}%</span></div>
-                                <div className="space-y-1.5 mb-4">
-                                    <div className="flex justify-between text-sm"><span className="text-emerald-600 font-medium">Receita</span><span className="text-zinc-700 font-mono">{fmt(m.receita)}</span></div>
-                                    <div className="flex justify-between text-sm"><span className="text-red-500 font-medium">Despesa</span><span className="text-zinc-700 font-mono">{fmt(m.despesa)}</span></div>
+                <div className="relative max-w-6xl mx-auto px-6 pt-20 pb-10 lg:pt-28 lg:pb-16">
+                    <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+                        {/* Left */}
+                        <div>
+                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-xs font-semibold mb-6">
+                                <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" /><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" /></span>
+                                30 dias grátis — sem compromisso
+                            </div>
+                            <h1 className="text-4xl sm:text-5xl font-extrabold text-zinc-900 tracking-tight leading-[1.08]">
+                                Seu dinheiro,
+                                <br />
+                                suas regras.
+                            </h1>
+                            <p className="mt-5 text-lg text-zinc-500 leading-relaxed max-w-lg">
+                                Chega de planilhas bagunçadas. Controle ganhos, despesas,
+                                parcelas, investimentos e metas — tudo num só lugar,
+                                do jeito que faz sentido pra você.
+                            </p>
+                            <div className="mt-8 flex flex-col sm:flex-row items-start gap-3">
+                                <Link href={register().url} className="group inline-flex items-center gap-2 h-12 px-7 rounded-lg text-sm font-semibold bg-zinc-900 text-white hover:bg-zinc-800 transition-all shadow-lg shadow-zinc-900/20">
+                                    Criar conta grátis
+                                    <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                                </Link>
+                                <Link href={login().url} className="inline-flex items-center h-12 px-7 rounded-lg text-sm font-semibold text-zinc-600 hover:text-zinc-900 transition-colors">
+                                    Já tenho conta
+                                </Link>
+                            </div>
+                            <div className="mt-6 flex items-center gap-5 text-xs text-zinc-400">
+                                <span className="flex items-center gap-1"><Check className="w-3.5 h-3.5 text-emerald-500" /> Sem cartão de crédito</span>
+                                <span className="flex items-center gap-1"><Check className="w-3.5 h-3.5 text-emerald-500" /> Cancele quando quiser</span>
+                            </div>
+                        </div>
+
+                        {/* Right — Dashboard preview */}
+                        <div className="relative">
+                            <div className="absolute -inset-4 bg-gradient-to-br from-emerald-100/40 via-transparent to-zinc-100/40 rounded-3xl blur-2xl pointer-events-none" />
+                            <div className="relative">
+                                <DashboardPreview />
+                                {/* Floating meta card */}
+                                <div className="absolute -bottom-6 -left-4 sm:-left-8 rounded-xl border border-zinc-200/80 bg-white shadow-lg p-3 flex items-center gap-3">
+                                    <Ring pct={72} color="#10b981" />
+                                    <div>
+                                        <div className="text-[11px] text-zinc-400 font-medium">Reserva de Emergência</div>
+                                        <div className="text-sm font-bold text-zinc-900">72% concluída</div>
+                                    </div>
                                 </div>
-                                <LP p={p}/>
-                                <div className="flex justify-between items-center mt-3 pt-3 border-t border-zinc-100"><span className="text-xs text-zinc-400">Balanço</span><span className={`text-sm font-bold font-mono ${b>=0?"text-emerald-600":"text-red-600"}`}>{fmt(b)}</span></div>
-                            </div>);})}
-                    </div>
-                </section>
-
-                {/* GANHOS */}
-                <section><SH title="Ganhos" onAdd={()=>{setEditingGanho(null);setModalGanho(true);}}/><MT a={gM} o={setGM}/>
-                    <div className="mt-3"><Tbl cols={[
-                        {key:"descricao",label:"Descrição",render:r=><span className="font-medium text-zinc-900">{r.descricao}</span>},
-                        {key:"fonte",label:"Fonte de Renda",render:r=><B>{r.fonte}</B>},
-                        {key:"data",label:"Data",render:r=><span className="text-zinc-500">{r.data}</span>},
-                        {key:"valor",label:"Valor",align:"right",render:r=><span className="font-mono font-semibold text-emerald-600">{fmt(r.valor)}</span>},
-                        {key:"balanco",label:"Balanço",render:r=><span className="text-zinc-400">{r.balanco}</span>},
-                    ]} data={gF} footer={[{label:"Contagem",value:gF.length},{label:"Soma",value:fmt(gF.reduce((s,g)=>s+g.valor,0))}]} onRowClick={openEditGanho}/></div>
-                </section>
-
-                {/* DESPESAS FIXAS */}
-                <section><SH title="Despesas Fixas" onAdd={()=>{setEditingFixa(null);setModalFixa(true);}}/><MT a={fM} o={setFM}/>
-                    <div className="mt-3"><Tbl cols={[
-                        {key:"descricao",label:"Descrição",render:r=><span className="font-medium text-zinc-900">{r.descricao}</span>},
-                        {key:"categoria",label:"Categoria",render:r=><B>{r.categoria}</B>},
-                        {key:"valor",label:"Valor",align:"right",render:r=><span className="font-mono">{fmt(r.valor)}</span>},
-                        {key:"vencimento",label:"Vencimento",render:r=><span className="text-zinc-500">{r.vencimento}</span>},
-                        {key:"status",label:"Status",render:r=><SB s={r.status}/>},
-                        {key:"dataPgto",label:"Data Pgto",render:r=><span className="text-zinc-500">{r.dataPgto}</span>},
-                        {key:"forma",label:"Forma",render:r=>r.forma?<B>{r.forma}</B>:<span className="text-zinc-300">—</span>},
-                    ]} data={fF} footer={[{label:"Contagem",value:fF.length},{label:"Soma",value:fmt(fF.reduce((s,d)=>s+d.valor,0))},{label:"Concluídos",value:`${fF.length>0?Math.round((fF.filter(d=>d.status==="Pago").length/fF.length)*100):0}%`}]} onRowClick={openEditFixa}/></div>
-                </section>
-
-                {/* DESPESAS VARIÁVEIS */}
-                <section><SH title="Despesas Variáveis" onAdd={()=>{setEditingDV(null);setModal(true);}}/><MT a={vM} o={setVM}/>
-                    <div className="mt-3"><Tbl cols={[
-                        {key:"descricao",label:"Descrição",render:r=><span className="font-medium text-zinc-900">{r.descricao}</span>},
-                        {key:"categoria",label:"Categoria",render:r=><B>{r.categoria}</B>},
-                        {key:"valor",label:"Valor",align:"right",render:r=><span className="font-mono">{fmt(r.valor)}</span>},
-                        {key:"data",label:"Data",render:r=><span className="text-zinc-500">{r.data}</span>},
-                        {key:"balanco",label:"Balanço",render:r=><span className="text-zinc-400">{mmYYYYtoFull(r.balanco)}</span>},
-                        {key:"forma",label:"Forma de Pagamento",render:r=>r.forma?<B>{r.forma}</B>:<span className="text-zinc-300">—</span>},
-                    ]} data={vF} footer={[{label:"Contagem",value:vF.length},{label:"Soma",value:fmt(vF.reduce((s,d)=>s+d.valor,0))}]} onRowClick={openEditDV}/></div>
-                </section>
-
-                {/* DÍVIDAS */}
-                <section><SH title="Dívidas" onAdd={()=>{setEditingDivida(null);setModalDivida(true);}}/><MT a={dM} o={setDM}/>
-                    <div className="mt-3"><Tbl cols={[
-                        {key:"descricao",label:"Descrição",render:r=><span className="font-medium text-zinc-900">{r.descricao}</span>},
-                        {key:"destino",label:"Destino",render:r=><B>{r.destino}</B>},
-                        {key:"valor",label:"Valor",align:"right",render:r=><span className="font-mono">{fmt(r.valor)}</span>},
-                        {key:"vencimento",label:"Vencimento",render:r=><span className="text-zinc-500">{r.vencimento}</span>},
-                        {key:"status",label:"Status",render:r=><SB s={r.status}/>},
-                        {key:"balanco",label:"Balanço",render:r=><span className="text-zinc-400">{r.balanco}</span>},
-                    ]} data={dF} footer={[{label:"Contagem",value:dF.length},{label:"Soma",value:fmt(dF.reduce((s,d)=>s+d.valor,0))},{label:"Concluídos",value:`${dF.length>0?Math.round((dF.filter(d=>d.status==="Pago").length/dF.length)*100):0}%`}]} onRowClick={openEditDivida}/></div>
-                </section>
-
-                {/* INVESTIMENTOS */}
-                <section><SH title="Investimentos" onAdd={()=>{setEditingInvest(null);setModalInvest(true);}}/><MT a={iM} o={setIM}/>
-                    <div className="mt-3"><Tbl cols={[
-                        {key:"produto",label:"Produto",render:r=><span className="font-mono font-semibold text-zinc-900">{r.produto}</span>},
-                        {key:"empresa",label:"Empresa",render:r=><span className="text-zinc-600">{r.empresa}</span>},
-                        {key:"valor",label:"Valor",align:"right",render:r=><span className="font-mono">{fmt(r.valor)}</span>},
-                        {key:"quantidade",label:"Qtd",align:"right"},
-                        {key:"valorTotal",label:"Total",align:"right",render:r=><span className="font-mono font-semibold">{fmt(r.valorTotal)}</span>},
-                        {key:"tipoAtivo",label:"Tipo",render:r=><B v={r.tipoAtivo.includes("Fundo")?"warning":"success"}>{r.tipoAtivo}</B>},
-                        {key:"provento",label:"Provento",align:"right",render:r=><span className="font-mono text-emerald-600">{fmt(r.provento)}</span>},
-                        {key:"frequencia",label:"Frequência",render:r=><B>{r.frequencia}</B>},
-                    ]} data={iF} footer={[{label:"Contagem",value:iF.length},{label:"Média",value:fmt(iF.length>0?iF.reduce((s,x)=>s+x.valor,0)/iF.length:0)},{label:"Soma Total",value:fmt(iF.reduce((s,x)=>s+x.valorTotal,0))}]} onRowClick={openEditInvest}/></div>
-                </section>
-
-                {/* METAS FINANCEIRAS */}
-                <section><SH title="Metas Financeiras" onAdd={()=>{setEditingMeta(null);setModalMeta(true);}}/>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {dataMetas.map(m=><div key={m.id} onClick={()=>{setEditingMeta(m);setModalMeta(true);}} className="cursor-pointer rounded-xl border border-zinc-200 bg-white p-6 hover:shadow-md hover:border-zinc-300 transition-all">
-                            <div className="flex items-center gap-4 mb-5">
-                                <div className="relative"><CP p={m.percent} size={56} sw={4}/><span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-zinc-700">{m.percent}%</span></div>
-                                <h3 className="font-semibold text-zinc-900 flex items-center gap-2"><IconPreview name={m.icone || "Gem"} className="size-5 text-zinc-700"/>{m.nome}</h3>
                             </div>
-                            <div className="space-y-2.5">
-                                <div className="flex justify-between text-sm"><span className="text-zinc-400">Valor</span><span className="font-mono font-semibold text-zinc-900">{fmt(m.valor)}</span></div>
-                                <div className="flex justify-between text-sm"><span className="text-zinc-400">Investido</span><span className="font-mono text-emerald-600">{fmt(m.investido)}</span></div>
-                                <div className="h-px bg-zinc-100"/><div className="flex justify-between text-sm"><span className="text-zinc-400">Faltante</span><span className="font-mono text-amber-600">{fmt(m.faltante)}</span></div>
-                            </div>
-                        </div>)}
-                    </div>
-                </section>
-
-                {/* FONTES DE RENDA */}
-                <section><SH title="Fontes de Renda" onAdd={()=>{setEditingFonte(null);setModalFonte(true);}}/>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {dataFontes.map(f=><div key={f.id} onClick={()=>{setEditingFonte(f);setModalFonte(true);}} className="cursor-pointer rounded-xl border border-zinc-200 bg-white p-6 hover:shadow-md hover:border-zinc-300 transition-all">
-                            <div className="flex items-center gap-4 mb-5">
-                                <div className="relative"><CP p={f.percent} size={56} sw={4}/><span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-zinc-700">{f.percent}%</span></div>
-                                <h3 className="font-semibold text-zinc-900 flex items-center gap-2"><IconPreview name={f.icone || "Briefcase"} className="size-5 text-zinc-700"/>{f.nome}</h3>
-                            </div>
-                            <div className="space-y-2.5">
-                                <div className="flex justify-between text-sm"><span className="text-zinc-400">Meta Anual</span><span className="font-mono font-semibold text-zinc-900">{fmt(f.metaAnual)}</span></div>
-                                <div className="flex justify-between text-sm"><span className="text-emerald-600 font-medium">Receita Anual</span><span className="font-mono text-emerald-600">{fmt(f.receitaAnual)}</span></div>
-                            </div>
-                        </div>)}
-                    </div>
-                </section>
-
-                {/* CATEGORIAS */}
-                <section><SH title="Categorias" onAdd={()=>{setEditingCategoria(null);setModalCategoria(true);}}/>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {dataCategs.map(c=><div key={c.id} onClick={()=>{setEditingCategoria(c);setModalCategoria(true);}} className="cursor-pointer rounded-xl border border-zinc-200 bg-white p-5 hover:shadow-md hover:border-zinc-300 transition-all">
-                            <div className="flex items-center gap-3 mb-3">
-                                <div className="relative"><CP p={c.pct} size={40} sw={3}/><span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-zinc-500">{c.pct>0?`${c.pct}%`:"—"}</span></div>
-                                <h3 className="font-semibold text-zinc-900 text-sm flex items-center gap-1.5"><IconPreview name={c.icone || "ShoppingBag"} className="size-4 text-zinc-600"/>{c.nome}</h3>
-                            </div>
-                            <div className="space-y-1.5">
-                                <div className="flex justify-between text-xs"><span className="text-zinc-400">Limite Anual</span><span className="font-mono text-zinc-600">{c.lim?fmt(c.lim):"—"}</span></div>
-                                <div className="flex justify-between text-xs"><span className="text-red-500">Despesa Anual</span><span className="font-mono text-red-500">{fmt(c.desp)}</span></div>
-                            </div>
-                        </div>)}
-                    </div>
-                </section>
-
-                {/* FORMAS DE PAGAMENTO */}
-                <section><SH title="Formas de Pagamento" onAdd={()=>{setEditingForma(null);setModalForma(true);}}/>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {dataFormas.map(f=><div key={f.id} onClick={()=>{setEditingForma(f);setModalForma(true);}} className="cursor-pointer rounded-xl border border-zinc-200 bg-white p-5 hover:shadow-md hover:border-zinc-300 transition-all">
-                            <div className="flex items-center gap-3 mb-3">
-                                <div className="relative"><CP p={f.pct} size={40} sw={3}/><span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-zinc-500">{f.pct}%</span></div>
-                                <h3 className="font-semibold text-zinc-900 text-sm flex items-center gap-1.5"><IconPreview name={f.icone || "CreditCard"} className="size-4 text-zinc-600"/>{f.nome}</h3>
-                            </div>
-                            <div className="space-y-1.5">
-                                <div className="flex justify-between text-xs"><span className="text-zinc-400">Limite Anual</span><span className="font-mono text-zinc-600">{fmt(f.lim)}</span></div>
-                                <div className="flex justify-between text-xs"><span className="text-red-500">Despesa Anual</span><span className="font-mono text-red-500">{fmt(f.desp)}</span></div>
-                            </div>
-                        </div>)}
-                    </div>
-                </section>
-            </div>
-
-            <DespesaVariavelModal open={modal} onClose={closeAll} onSubmit={submitDV} loading={loading}
-                categorias={configCategorias} formas={configFormas}
-                initialData={editingDV?{descricao:editingDV.descricao,categoria:editingDV.categoria,valor:String(editingDV.valor),data:editingDV.data,forma:editingDV.forma,balanco:editingDV.balanco,parcelas:"1"}:undefined}
-                onDelete={editingDV?requestDeleteDV:undefined}/>
-            <GanhoModal open={modalGanho} onClose={closeAll} onSubmit={submitGanho} loading={loading}
-                fontes={configFontes}
-                initialData={editingGanho?{descricao:editingGanho.descricao,fonte:editingGanho.fonte,data:editingGanho.data,valor:String(editingGanho.valor)}:undefined}
-                onDelete={editingGanho?requestDeleteGanho:undefined}/>
-            <DespesaFixaModal open={modalFixa} onClose={closeAll} onSubmit={submitFixa} loading={loading}
-                categorias={configCategorias} formas={configFormas}
-                initialData={editingFixa?{descricao:editingFixa.descricao,categoria:editingFixa.categoria,valor:String(editingFixa.valor),vencimento:editingFixa.vencimento,status:editingFixa.status,dataPgto:editingFixa.dataPgto,forma:editingFixa.forma}:undefined}
-                onDelete={editingFixa?requestDeleteFixa:undefined}/>
-            <DividaModal open={modalDivida} onClose={closeAll} onSubmit={submitDivida} loading={loading}
-                initialData={editingDivida?{descricao:editingDivida.descricao,destino:editingDivida.destino,valor:String(editingDivida.valor),vencimento:editingDivida.vencimento,status:editingDivida.status}:undefined}
-                onDelete={editingDivida?requestDeleteDivida:undefined}/>
-            <InvestimentoModal open={modalInvest} onClose={closeAll} onSubmit={submitInvest} loading={loading}
-                onSubmitMeta={submitMetaInvest}
-                metas={dataMetas.map(m=>({id:m.id,nome:m.nome,valor:m.valor,investido:m.investido}))}
-                initialData={editingInvest?{produto:editingInvest.produto,empresa:editingInvest.empresa,valor:String(editingInvest.valor),quantidade:String(editingInvest.quantidade),tipoAtivo:editingInvest.tipoAtivo,provento:String(editingInvest.provento),frequencia:editingInvest.frequencia,data:editingInvest.data}:undefined}
-                onDelete={editingInvest?requestDeleteInvest:undefined}/>
-            <MetaModal open={modalMeta} onClose={closeAll} onSubmit={submitMeta} loading={loading}
-                initialData={editingMeta?{nome:editingMeta.nome,icone:editingMeta.icone||"Gem",valor:String(editingMeta.valor)}:undefined}
-                onDelete={editingMeta?requestDeleteMeta:undefined}/>
-
-            <ConfigModal open={modalFonte} onClose={closeAll} onSubmit={submitFonte} loading={loading}
-                title="Fonte de Renda" valorLabel="Meta Anual (R$)" valorPlaceholder="0,00" defaultIcon="Briefcase"
-                initialData={editingFonte?{nome:editingFonte.nome,icone:editingFonte.icone||"Briefcase",valor:String(editingFonte.metaAnual||"")}:undefined}
-                onDelete={editingFonte?requestDeleteFonte:undefined}/>
-            <ConfigModal open={modalCategoria} onClose={closeAll} onSubmit={submitCategoria} loading={loading}
-                title="Categoria" valorLabel="Limite Anual (R$)" valorPlaceholder="0,00" defaultIcon="ShoppingBag"
-                initialData={editingCategoria?{nome:editingCategoria.nome,icone:editingCategoria.icone||"ShoppingBag",valor:editingCategoria.lim!=null?String(editingCategoria.lim):""}:undefined}
-                onDelete={editingCategoria?requestDeleteCategoria:undefined}/>
-            <ConfigModal open={modalForma} onClose={closeAll} onSubmit={submitForma} loading={loading}
-                title="Forma de Pagamento" valorLabel="Limite Anual (R$)" valorPlaceholder="0,00" defaultIcon="CreditCard"
-                initialData={editingForma?{nome:editingForma.nome,icone:editingForma.icone||"CreditCard",valor:String(editingForma.lim||"")}:undefined}
-                onDelete={editingForma?requestDeleteForma:undefined}/>
-
-            {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO */}
-            {deleteConfirm && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ animation: "fi .15s ease" }}>
-                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !deleting && setDeleteConfirm(null)} />
-                    <div className="relative bg-white rounded-xl shadow-2xl border border-zinc-200 w-full max-w-sm mx-4 p-6" style={{ animation: "si .2s ease" }}>
-                        <h3 className="text-base font-semibold text-zinc-900">Excluir registro?</h3>
-                        <p className="text-sm text-zinc-500 mt-2">Essa ação não pode ser desfeita. O registro será removido permanentemente.</p>
-                        <div className="flex justify-end gap-3 mt-6">
-                            <button onClick={() => setDeleteConfirm(null)} disabled={deleting} className="h-9 px-4 rounded-md border border-zinc-200 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors disabled:opacity-50">
-                                Cancelar
-                            </button>
-                            <button onClick={deleteConfirm.action} disabled={deleting} className="h-9 px-4 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center gap-2">
-                                {deleting ? <><Spinner className="size-4" /> Excluindo...</> : "Excluir"}
-                            </button>
                         </div>
                     </div>
-                    <style>{`@keyframes fi{from{opacity:0}to{opacity:1}}@keyframes si{from{opacity:0;transform:scale(.96) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}`}</style>
                 </div>
-            )}
+            </section>
+
+            {/* ── NUMBERS ────────────────────────────────────────────────── */}
+            <section className="border-y border-zinc-100 bg-zinc-50/50">
+                <div className="max-w-6xl mx-auto px-6 py-12 grid grid-cols-2 sm:grid-cols-4 gap-8 text-center">
+                    {[
+                        { n: "100%", sub: "Gratuito por 30 dias" },
+                        { n: "6", sub: "Módulos financeiros" },
+                        { n: "2FA", sub: "Autenticação segura" },
+                        { n: "∞", sub: "Registros ilimitados" },
+                    ].map(s => (
+                        <div key={s.sub}>
+                            <div className="text-3xl font-extrabold text-zinc-900">{s.n}</div>
+                            <div className="mt-1 text-sm text-zinc-500">{s.sub}</div>
+                        </div>
+                    ))}
+                </div>
+            </section>
+
+            {/* ── FEATURES ───────────────────────────────────────────────── */}
+            <section className="max-w-6xl mx-auto px-6 py-20 lg:py-28">
+                <div className="text-center mb-16">
+                    <p className="text-sm font-semibold text-emerald-600 mb-2">Funcionalidades</p>
+                    <h2 className="text-3xl sm:text-4xl font-extrabold text-zinc-900 tracking-tight">
+                        Pare de adivinhar,<br className="hidden sm:block" /> comece a controlar
+                    </h2>
+                </div>
+
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-px bg-zinc-200 rounded-2xl overflow-hidden border border-zinc-200">
+                    {[
+                        { icon: TrendingUp, title: "Balanço Mensal", desc: "Gráfico de receitas vs despesas mês a mês. Visualize em segundos se está no positivo ou no vermelho.", accent: "bg-emerald-100 text-emerald-700" },
+                        { icon: CreditCard, title: "Parcelas Automáticas", desc: "Comprou em 10x? O sistema divide e distribui nos meses certos. Cada parcela vira um registro independente.", accent: "bg-blue-100 text-blue-700" },
+                        { icon: Target, title: "Metas com Progresso", desc: "Reserva de emergência, viagem, carro novo — defina o valor e acompanhe quanto já investiu e quanto falta.", accent: "bg-amber-100 text-amber-700" },
+                        { icon: Wallet, title: "Investimentos", desc: "Registre ações, FIIs, renda fixa. Controle preço médio, proventos recebidos e frequência de aportes.", accent: "bg-violet-100 text-violet-700" },
+                        { icon: PieChart, title: "Categorias Inteligentes", desc: "Crie categorias e formas de pagamento personalizadas com limites anuais e ícones. Veja onde concentra seus gastos.", accent: "bg-rose-100 text-rose-700" },
+                        { icon: ShieldCheck, title: "Privacidade Total", desc: "Seus dados não são compartilhados. Login seguro com 2FA. Cada usuário acessa apenas suas próprias finanças.", accent: "bg-zinc-100 text-zinc-700" },
+                    ].map(f => (
+                        <div key={f.title} className="bg-white p-7 hover:bg-zinc-50/50 transition-colors">
+                            <div className={`w-10 h-10 rounded-lg ${f.accent} flex items-center justify-center mb-4`}>
+                                <f.icon className="w-5 h-5" />
+                            </div>
+                            <h3 className="font-semibold text-zinc-900 mb-2">{f.title}</h3>
+                            <p className="text-sm text-zinc-500 leading-relaxed">{f.desc}</p>
+                        </div>
+                    ))}
+                </div>
+            </section>
+
+            {/* ── PRICING ────────────────────────────────────────────────── */}
+            <section className="bg-zinc-50/80 border-y border-zinc-100">
+                <div className="max-w-6xl mx-auto px-6 py-20 lg:py-28">
+                    <div className="text-center mb-16">
+                        <p className="text-sm font-semibold text-emerald-600 mb-2">Planos</p>
+                        <h2 className="text-3xl sm:text-4xl font-extrabold text-zinc-900 tracking-tight">
+                            Simples e transparente
+                        </h2>
+                        <p className="mt-3 text-zinc-500">Comece grátis. Depois, escolha o que faz sentido pra você.</p>
+                    </div>
+
+                    <div className="grid sm:grid-cols-2 gap-6 max-w-3xl mx-auto">
+                        {/* Free */}
+                        <div className="rounded-2xl border border-zinc-200 bg-white p-8">
+                            <div className="text-sm font-semibold text-zinc-900 mb-1">Gratuito</div>
+                            <div className="text-zinc-500 text-xs mb-6">Para experimentar sem pressa</div>
+                            <div className="flex items-baseline gap-1 mb-6">
+                                <span className="text-4xl font-extrabold text-zinc-900">R$ 0</span>
+                                <span className="text-zinc-400 text-sm">/mês</span>
+                            </div>
+                            <ul className="space-y-3 mb-8">
+                                {["30 dias de acesso completo", "Todos os módulos inclusos", "Registros ilimitados", "Exportação de dados"].map(t => (
+                                    <li key={t} className="flex items-start gap-2 text-sm text-zinc-600">
+                                        <Check className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" /> {t}
+                                    </li>
+                                ))}
+                            </ul>
+                            <Link href={register().url} className="block w-full h-11 rounded-lg border border-zinc-200 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors flex items-center justify-center">
+                                Começar grátis
+                            </Link>
+                        </div>
+
+                        {/* Pro */}
+                        <div className="rounded-2xl border-2 border-zinc-900 bg-white p-8 relative">
+                            <div className="absolute -top-3 left-6 px-3 py-0.5 rounded-full bg-zinc-900 text-white text-[11px] font-semibold">
+                                Mais popular
+                            </div>
+                            <div className="text-sm font-semibold text-zinc-900 mb-1">Pro</div>
+                            <div className="text-zinc-500 text-xs mb-6">Para quem leva a sério</div>
+                            <div className="flex items-baseline gap-1 mb-6">
+                                <span className="text-4xl font-extrabold text-zinc-900">R$ 12</span>
+                                <span className="text-zinc-400 text-sm">/mês</span>
+                            </div>
+                            <ul className="space-y-3 mb-8">
+                                {["Tudo do plano Gratuito", "Acesso vitalício", "Painel administrativo", "Suporte prioritário", "Novas funcionalidades primeiro"].map(t => (
+                                    <li key={t} className="flex items-start gap-2 text-sm text-zinc-600">
+                                        <Check className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" /> {t}
+                                    </li>
+                                ))}
+                            </ul>
+                            <Link href={register().url} className="block w-full h-11 rounded-lg bg-zinc-900 text-white text-sm font-semibold hover:bg-zinc-800 transition-colors flex items-center justify-center">
+                                Começar com 30 dias grátis
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* ── TESTIMONIAL / SOCIAL PROOF ─────────────────────────────── */}
+            <section className="max-w-6xl mx-auto px-6 py-20 lg:py-28">
+                <div className="max-w-2xl mx-auto text-center">
+                    <div className="inline-flex -space-x-2 mb-6">
+                        {["bg-emerald-400", "bg-blue-400", "bg-amber-400", "bg-rose-400", "bg-violet-400"].map((bg, i) => (
+                            <div key={i} className={`w-9 h-9 rounded-full ${bg} border-2 border-white flex items-center justify-center text-white text-xs font-bold`}>
+                                {["M", "A", "R", "J", "C"][i]}
+                            </div>
+                        ))}
+                    </div>
+                    <blockquote className="text-xl sm:text-2xl font-semibold text-zinc-900 leading-snug">
+                        "Eu vivia perdido com planilhas que nunca batiam. Aqui eu cadastro e pronto — sei exatamente quanto sobra no mês."
+                    </blockquote>
+                    <p className="mt-4 text-sm text-zinc-400">Marcos R. — usuário desde 2025</p>
+                </div>
+            </section>
+
+            {/* ── CTA FINAL ──────────────────────────────────────────────── */}
+            <section className="max-w-6xl mx-auto px-6 pb-20">
+                <div className="relative rounded-2xl bg-zinc-900 px-8 py-16 text-center overflow-hidden">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(16,185,129,0.12),transparent_60%)]" />
+                    <div className="relative">
+                        <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+                            O melhor momento pra<br />organizar suas finanças é agora.
+                        </h2>
+                        <p className="mt-4 text-zinc-400 max-w-md mx-auto">
+                            30 dias grátis. Sem cartão. Sem pegadinhas.
+                        </p>
+                        <Link href={register().url} className="mt-8 group inline-flex items-center gap-2 h-12 px-8 rounded-lg text-sm font-semibold bg-white text-zinc-900 hover:bg-zinc-100 transition-colors">
+                            Criar minha conta
+                            <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                        </Link>
+                    </div>
+                </div>
+            </section>
+
+            {/* ── FOOTER ─────────────────────────────────────────────────── */}
+            <footer className="border-t border-zinc-200 py-8">
+                <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded bg-zinc-900 flex items-center justify-center text-white text-[10px] font-bold">F</div>
+                        <span className="text-sm font-semibold text-zinc-900">Finanças</span>
+                    </div>
+                    <span className="text-sm text-zinc-400">&copy; {new Date().getFullYear()} Todos os direitos reservados.</span>
+                </div>
+            </footer>
         </div>
     );
 }

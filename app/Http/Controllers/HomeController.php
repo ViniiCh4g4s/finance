@@ -6,10 +6,14 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
-class WelcomeController extends Controller
+class HomeController extends Controller
 {
     public function index(Request $request)
     {
+        if (!$request->user()) {
+            return Inertia::render('welcome');
+        }
+
         $user = $request->user();
         $ano = (int) $request->query('ano', now()->year);
 
@@ -76,7 +80,7 @@ class WelcomeController extends Controller
 
         $fmtDate = fn ($d) => $d ? Carbon::parse($d)->format('d/m/Y') : '';
 
-        return Inertia::render('welcome', [
+        return Inertia::render('home', [
             'ano' => $ano,
             'balancoMensal' => $balancoMensal,
             'ganhos' => $ganhos->map(fn ($g) => [

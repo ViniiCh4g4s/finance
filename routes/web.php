@@ -9,13 +9,13 @@ use App\Http\Controllers\FormaPagamentoController;
 use App\Http\Controllers\GanhoController;
 use App\Http\Controllers\InvestimentoController;
 use App\Http\Controllers\MetaController;
-use App\Http\Controllers\WelcomeController;
+use App\Http\Controllers\HomeController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::middleware('auth')->group(function () {
-    Route::get('/', [WelcomeController::class, 'index'])->name('home');
+Route::get('/', [HomeController::class, 'index'])->name('home');
 
+Route::middleware('auth')->group(function () {
     Route::resource('ganhos', GanhoController::class)->only(['store', 'update', 'destroy']);
     Route::resource('despesas-fixas', DespesaFixaController::class)->only(['store', 'update', 'destroy']);
     Route::resource('despesas-variaveis', DespesaVariavelController::class)->only(['store', 'update', 'destroy']);
@@ -30,6 +30,6 @@ Route::middleware('auth')->group(function () {
 
 Route::get('dashboard', function () {
     return Inertia::render('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+})->middleware(['auth', 'verified', 'admin'])->name('dashboard');
 
 require __DIR__.'/settings.php';
