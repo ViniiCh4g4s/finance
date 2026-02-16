@@ -42,9 +42,15 @@ class MetaController extends Controller
         $data = $request->validate([
             'valor' => 'required|numeric|min:0.01',
             'data' => 'required|string',
+            'dataLimite' => 'nullable|string',
         ]);
 
-        $request->user()->investimentos()->create([
+        $dataInvest = Carbon::createFromFormat('d/m/Y', $data['data']);
+        $dataLimite = !empty($data['dataLimite'])
+            ? Carbon::createFromFormat('m/Y', $data['dataLimite'])->startOfMonth()
+            : null;
+
+        $base = [
             'produto' => $meta->nome,
             'empresa' => '',
             'valor' => $data['valor'],
@@ -52,8 +58,20 @@ class MetaController extends Controller
             'tipo_ativo' => 'Meta Financeira',
             'provento' => 0,
             'frequencia' => '',
-            'data' => Carbon::createFromFormat('d/m/Y', $data['data'])->toDateString(),
-        ]);
+        ];
+
+        if ($dataLimite && $dataLimite->gte($dataInvest->copy()->startOfMonth())) {
+            $current = $dataInvest->copy();
+            while ($current->copy()->startOfMonth()->lte($dataLimite)) {
+                $rec = $base;
+                $rec['data'] = $current->toDateString();
+                $request->user()->investimentos()->create($rec);
+                $current->addMonth();
+            }
+        } else {
+            $base['data'] = $dataInvest->toDateString();
+            $request->user()->investimentos()->create($base);
+        }
 
         return back();
     }

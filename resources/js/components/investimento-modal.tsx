@@ -19,12 +19,14 @@ export interface InvestimentoFormData {
     provento: string;
     frequencia: string;
     data: string;
+    dataLimite: string;
 }
 
 export interface MetaInvestFormData {
     metaId: number;
     valor: string;
     data: string;
+    dataLimite: string;
 }
 
 interface MetaOption {
@@ -47,8 +49,9 @@ interface Props {
 
 const TIPOS = ["Ação Brasileira", "Ação Internacional", "Fundo Imobiliário", "ETF", "Renda Fixa", "Criptomoeda", "Outros"];
 const FREQUENCIAS = ["Mensal", "Trimestral", "Semestral", "Anual"];
+const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
-const empty: InvestimentoFormData = { produto: "", empresa: "", valor: "", quantidade: "", tipoAtivo: "", provento: "", frequencia: "", data: "" };
+const empty: InvestimentoFormData = { produto: "", empresa: "", valor: "", quantidade: "", tipoAtivo: "", provento: "", frequencia: "", data: "", dataLimite: "" };
 
 const inputCls = "w-full h-9 px-3 rounded-md border border-zinc-200 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-950/10 focus:border-zinc-400 bg-white";
 const fmt = (v: number): string => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -60,6 +63,24 @@ const toDate = (s: string): Date | undefined => {
 };
 const toStr = (d: Date | undefined): string => d ? format(d, "dd/MM/yyyy") : "";
 
+const balancoToDate = (value: string): Date | undefined => {
+    if (!value) return undefined;
+    const d = parse(value, "MM/yyyy", new Date());
+    return isValid(d) ? d : undefined;
+};
+const dateToBalanco = (d: Date | undefined): string => {
+    if (!d) return "";
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    return `${mm}/${d.getFullYear()}`;
+};
+const balancoLabel = (value: string): string => {
+    if (!value) return "";
+    const [mm, yyyy] = value.split("/");
+    const idx = parseInt(mm, 10) - 1;
+    if (idx < 0 || idx > 11) return value;
+    return `${MESES[idx]} ${yyyy}`;
+};
+
 export default function InvestimentoModal({ open, onClose, onSubmit, onSubmitMeta, initialData, onDelete, metas, loading }: Props) {
     const [form, setForm] = useState<InvestimentoFormData>(empty);
     const sf = (k: keyof InvestimentoFormData, v: string) => setForm(p => ({ ...p, [k]: v }));
@@ -70,6 +91,8 @@ export default function InvestimentoModal({ open, onClose, onSubmit, onSubmitMet
     const [metaValor, setMetaValor] = useState("");
     const [metaData, setMetaData] = useState("");
     const [popMetaData, setPopMetaData] = useState(false);
+    const [recorrente, setRecorrente] = useState(false);
+    const [popLimite, setPopLimite] = useState(false);
 
     useEffect(() => {
         if (open) {
@@ -78,10 +101,15 @@ export default function InvestimentoModal({ open, onClose, onSubmit, onSubmitMet
             setMetaId(null);
             setMetaValor("");
             setMetaData("");
+            setRecorrente(false);
         }
     }, [open]);
 
-    const handleClose = () => { if (loading) return; setForm(empty); setMetaId(null); setMetaValor(""); setMetaData(""); onClose(); };
+    useEffect(() => {
+        if (!recorrente) sf("dataLimite", "");
+    }, [recorrente]);
+
+    const handleClose = () => { if (loading) return; setForm(empty); setMetaId(null); setMetaValor(""); setMetaData(""); setRecorrente(false); onClose(); };
 
     const handleSubmit = () => {
         if (!form.produto || !form.valor || !form.quantidade || !form.data) return;
@@ -90,11 +118,43 @@ export default function InvestimentoModal({ open, onClose, onSubmit, onSubmitMet
 
     const handleSubmitMeta = () => {
         if (!metaId || !metaValor || !metaData || !onSubmitMeta) return;
-        onSubmitMeta({ metaId, valor: metaValor, data: metaData });
+        onSubmitMeta({ metaId, valor: metaValor, data: metaData, dataLimite: recorrente ? form.dataLimite : "" });
     };
 
     const selectedMeta = metas?.find(m => m.id === metaId);
     const metaNames = metas?.map(m => m.nome) ?? [];
+
+    const recorrenciaUI = (
+        <>
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" checked={recorrente} onChange={e => setRecorrente(e.target.checked)} className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950/10" />
+                <span className="text-sm text-zinc-600">Recorrente (repetir mensalmente)</span>
+            </label>
+            {recorrente && (
+                <div className="space-y-1.5">
+                    <label className="block text-sm font-medium text-zinc-700">Repetir até</label>
+                    <Popover open={popLimite} onOpenChange={setPopLimite}>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" data-empty={!form.dataLimite} className="w-full h-9 justify-between text-left font-normal text-sm data-[empty=true]:text-muted-foreground">
+                                {form.dataLimite ? balancoLabel(form.dataLimite) : <span>Selecione o mês...</span>}
+                                <ChevronDownIcon className="size-4 opacity-50" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                                mode="single"
+                                selected={balancoToDate(form.dataLimite)}
+                                onSelect={d => { sf("dataLimite", dateToBalanco(d)); setPopLimite(false); }}
+                                defaultMonth={balancoToDate(form.dataLimite)}
+                                locale={ptBR}
+                                captionLayout="dropdown"
+                            />
+                        </PopoverContent>
+                    </Popover>
+                </div>
+            )}
+        </>
+    );
 
     if (!open) return null;
 
@@ -191,6 +251,7 @@ export default function InvestimentoModal({ open, onClose, onSubmit, onSubmitMet
                                         </PopoverContent>
                                     </Popover>
                                 </div>
+                                {recorrenciaUI}
                                 <div className="pt-1 flex gap-3">
                                     <button type="submit" disabled={loading} className="flex-1 h-10 rounded-md bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800 active:bg-zinc-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
                                         {loading ? <><Spinner className="size-4" /> Adicionando...</> : "Adicionar Investimento"}
@@ -249,6 +310,7 @@ export default function InvestimentoModal({ open, onClose, onSubmit, onSubmitMet
                                         </PopoverContent>
                                     </Popover>
                                 </div>
+                                {recorrenciaUI}
                                 <div className="pt-1 flex gap-3">
                                     <button type="submit" disabled={loading} className="flex-1 h-10 rounded-md bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800 active:bg-zinc-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
                                         {loading ? <><Spinner className="size-4" /> Investindo...</> : "Investir na Meta"}
