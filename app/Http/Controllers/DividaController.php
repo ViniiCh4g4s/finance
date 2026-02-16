@@ -15,11 +15,28 @@ class DividaController extends Controller
             'valor' => 'required|numeric|min:0',
             'vencimento' => 'required|string',
             'status' => 'required|string|max:255',
+            'dataLimite' => 'nullable|string',
         ]);
 
-        $data['vencimento'] = Carbon::createFromFormat('d/m/Y', $data['vencimento'])->toDateString();
+        $vencimento = Carbon::createFromFormat('d/m/Y', $data['vencimento']);
+        $dataLimite = !empty($data['dataLimite'])
+            ? Carbon::createFromFormat('m/Y', $data['dataLimite'])->startOfMonth()
+            : null;
 
-        $request->user()->dividas()->create($data);
+        unset($data['dataLimite']);
+        $data['vencimento'] = $vencimento->toDateString();
+
+        if ($dataLimite && $dataLimite->gte($vencimento->copy()->startOfMonth())) {
+            $current = $vencimento->copy();
+            while ($current->copy()->startOfMonth()->lte($dataLimite)) {
+                $rec = $data;
+                $rec['vencimento'] = $current->toDateString();
+                $request->user()->dividas()->create($rec);
+                $current->addMonth();
+            }
+        } else {
+            $request->user()->dividas()->create($data);
+        }
 
         return back();
     }

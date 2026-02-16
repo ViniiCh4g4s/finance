@@ -82,6 +82,11 @@ const applyFilters = <T extends Record<string, any>>(rows: T[], filters: Record<
     if (active.length === 0) return rows;
     return rows.filter(r => active.every(([k, v]) => String(r[k]) === v));
 };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const sortByDate = <T extends Record<string, any>>(rows: T[], key: string): T[] => {
+    const parse = (d: string) => { const p=d.split('/').map(Number); return p.length===3?p[2]*10000+p[1]*100+p[0]:0; };
+    return [...rows].sort((a,b)=>parse(String(b[key]))-parse(String(a[key])));
+};
 interface FilterDef { key: string; label: string; options: string[] }
 
 /* ── UI ───────────────────────────────────────────────────────────────────── */
@@ -282,7 +287,7 @@ export default function FinancasDashboard() {
     };
     const submitMetaInvest=(data: MetaInvestFormData)=>{
         setLoading(true);
-        router.post(metas.investir(data.metaId).url, { valor: data.valor, data: data.data }, rOpts);
+        router.post(metas.investir(data.metaId).url, { valor: data.valor, data: data.data, dataLimite: data.dataLimite || undefined }, rOpts);
     };
 
     const submitFonte=(data: ConfigFormData)=>{
@@ -348,11 +353,11 @@ export default function FinancasDashboard() {
     const vMonth=byMonthMMYYYY(dataVar,"balanco",vM);
     const dMonth=byMonth(dataDividas,"balanco",dM);
     const iMonth=byMonth(dataInvest,"balanco",iM);
-    const gF=applyFilters(gMonth,gFilters);
-    const fF=applyFilters(fMonth,fFilters);
-    const vF=applyFilters(vMonth,vFilters);
-    const dF=applyFilters(dMonth,dFilters);
-    const iF=applyFilters(iMonth,iFilters);
+    const gF=sortByDate(applyFilters(gMonth,gFilters),"data");
+    const fF=sortByDate(applyFilters(fMonth,fFilters),"vencimento");
+    const vF=sortByDate(applyFilters(vMonth,vFilters),"data");
+    const dF=sortByDate(applyFilters(dMonth,dFilters),"vencimento");
+    const iF=sortByDate(applyFilters(iMonth,iFilters),"data");
     const gFD:FilterDef[]=[{key:"fonte",label:"Fonte de Renda",options:unique(gMonth,"fonte")}];
     const fFD:FilterDef[]=[{key:"categoria",label:"Categoria",options:unique(fMonth,"categoria")},{key:"status",label:"Status",options:unique(fMonth,"status")},{key:"forma",label:"Forma",options:unique(fMonth,"forma")}];
     const vFD:FilterDef[]=[{key:"categoria",label:"Categoria",options:unique(vMonth,"categoria")},{key:"forma",label:"Forma de Pagamento",options:unique(vMonth,"forma")}];
@@ -556,12 +561,12 @@ export default function FinancasDashboard() {
                 initialData={editingFixa?{descricao:editingFixa.descricao,categoria:editingFixa.categoria,valor:String(editingFixa.valor),vencimento:editingFixa.vencimento,status:editingFixa.status,dataPgto:editingFixa.dataPgto,forma:editingFixa.forma}:undefined}
                 onDelete={editingFixa?requestDeleteFixa:undefined}/>
             <DividaModal open={modalDivida} onClose={closeAll} onSubmit={submitDivida} loading={loading}
-                initialData={editingDivida?{descricao:editingDivida.descricao,destino:editingDivida.destino,valor:String(editingDivida.valor),vencimento:editingDivida.vencimento,status:editingDivida.status}:undefined}
+                initialData={editingDivida?{descricao:editingDivida.descricao,destino:editingDivida.destino,valor:String(editingDivida.valor),vencimento:editingDivida.vencimento,status:editingDivida.status,dataLimite:""}:undefined}
                 onDelete={editingDivida?requestDeleteDivida:undefined}/>
             <InvestimentoModal open={modalInvest} onClose={closeAll} onSubmit={submitInvest} loading={loading}
                 onSubmitMeta={submitMetaInvest}
                 metas={dataMetas.map(m=>({id:m.id,nome:m.nome,valor:m.valor,investido:m.investido}))}
-                initialData={editingInvest?{produto:editingInvest.produto,empresa:editingInvest.empresa,valor:String(editingInvest.valor),quantidade:String(editingInvest.quantidade),tipoAtivo:editingInvest.tipoAtivo,provento:String(editingInvest.provento),frequencia:editingInvest.frequencia,data:editingInvest.data}:undefined}
+                initialData={editingInvest?{produto:editingInvest.produto,empresa:editingInvest.empresa,valor:String(editingInvest.valor),quantidade:String(editingInvest.quantidade),tipoAtivo:editingInvest.tipoAtivo,provento:String(editingInvest.provento),frequencia:editingInvest.frequencia,data:editingInvest.data,dataLimite:""}:undefined}
                 onDelete={editingInvest?requestDeleteInvest:undefined}/>
             <MetaModal open={modalMeta} onClose={closeAll} onSubmit={submitMeta} loading={loading}
                 initialData={editingMeta?{nome:editingMeta.nome,icone:editingMeta.icone||"Gem",valor:String(editingMeta.valor)}:undefined}

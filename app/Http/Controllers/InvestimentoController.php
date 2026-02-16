@@ -18,9 +18,15 @@ class InvestimentoController extends Controller
             'provento' => 'nullable|numeric|min:0',
             'frequencia' => 'required|string|max:255',
             'data' => 'required|string',
+            'dataLimite' => 'nullable|string',
         ]);
 
-        $request->user()->investimentos()->create([
+        $dataInvest = Carbon::createFromFormat('d/m/Y', $data['data']);
+        $dataLimite = !empty($data['dataLimite'])
+            ? Carbon::createFromFormat('m/Y', $data['dataLimite'])->startOfMonth()
+            : null;
+
+        $base = [
             'produto' => $data['produto'],
             'empresa' => $data['empresa'],
             'valor' => $data['valor'],
@@ -28,8 +34,20 @@ class InvestimentoController extends Controller
             'tipo_ativo' => $data['tipoAtivo'],
             'provento' => $data['provento'] ?? 0,
             'frequencia' => $data['frequencia'],
-            'data' => Carbon::createFromFormat('d/m/Y', $data['data'])->toDateString(),
-        ]);
+        ];
+
+        if ($dataLimite && $dataLimite->gte($dataInvest->copy()->startOfMonth())) {
+            $current = $dataInvest->copy();
+            while ($current->copy()->startOfMonth()->lte($dataLimite)) {
+                $rec = $base;
+                $rec['data'] = $current->toDateString();
+                $request->user()->investimentos()->create($rec);
+                $current->addMonth();
+            }
+        } else {
+            $base['data'] = $dataInvest->toDateString();
+            $request->user()->investimentos()->create($base);
+        }
 
         return back();
     }
