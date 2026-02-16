@@ -14,11 +14,28 @@ class GanhoController extends Controller
             'fonte' => 'required|string|max:255',
             'data' => 'required|string',
             'valor' => 'required|numeric|min:0',
+            'dataLimite' => 'nullable|string',
         ]);
 
-        $data['data'] = Carbon::createFromFormat('d/m/Y', $data['data'])->toDateString();
+        $dataGanho = Carbon::createFromFormat('d/m/Y', $data['data']);
+        $dataLimite = !empty($data['dataLimite'])
+            ? Carbon::createFromFormat('m/Y', $data['dataLimite'])->startOfMonth()
+            : null;
 
-        $request->user()->ganhos()->create($data);
+        unset($data['dataLimite']);
+        $data['data'] = $dataGanho->toDateString();
+
+        if ($dataLimite && $dataLimite->gte($dataGanho->copy()->startOfMonth())) {
+            $current = $dataGanho->copy();
+            while ($current->copy()->startOfMonth()->lte($dataLimite)) {
+                $rec = $data;
+                $rec['data'] = $current->toDateString();
+                $request->user()->ganhos()->create($rec);
+                $current->addMonth();
+            }
+        } else {
+            $request->user()->ganhos()->create($data);
+        }
 
         return back();
     }
