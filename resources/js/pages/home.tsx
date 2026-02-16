@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Link, usePage, router } from "@inertiajs/react";
 import { logout } from "@/routes";
 import ganhos from "@/routes/ganhos";
@@ -117,8 +117,15 @@ const TabsNav = ({tabs,active,onChange}: {tabs: readonly string[]; active: strin
 );
 const MT = ({a,o}: {a: string; o: (tab: string) => void}) => <TabsNav tabs={MONTHS} active={a} onChange={o}/>;
 
+const PAGE_SIZE = 15;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const Tbl = ({cols,data,footer,onRowClick}: {cols: Column[]; data: Record<string, any>[]; footer?: FooterItem[]; onRowClick?: (row: Record<string, any>) => void}) => (
+const Tbl = ({cols,data,footer,onRowClick}: {cols: Column[]; data: Record<string, any>[]; footer?: FooterItem[]; onRowClick?: (row: Record<string, any>) => void}) => {
+    const [page,setPage]=useState(1);
+    const dataKey=data.map(r=>r.id??'').join(',');
+    useEffect(()=>setPage(1),[dataKey]);
+    const totalPages=Math.ceil(data.length/PAGE_SIZE);
+    const rows=totalPages>1?data.slice((page-1)*PAGE_SIZE,page*PAGE_SIZE):data;
+    return (
     <div className="rounded-xl border border-zinc-200 overflow-hidden bg-white shadow-sm">
         <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -126,18 +133,30 @@ const Tbl = ({cols,data,footer,onRowClick}: {cols: Column[]; data: Record<string
                     {cols.map(c=><th key={c.key} className={`px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider ${c.align==="right"?"text-right":""}`}>{c.label}</th>)}
                 </tr></thead>
                 <tbody className="divide-y divide-zinc-50">
-                {data.length===0?<tr><td colSpan={cols.length} className="px-4 py-10 text-center text-sm text-zinc-400">Nenhum registro neste mês</td></tr>
-                    :data.map((row,i)=><tr key={row.id||i} onClick={()=>onRowClick?.(row)} className={`hover:bg-zinc-50/60 transition-colors ${onRowClick?"cursor-pointer":""}`}>
+                {rows.length===0?<tr><td colSpan={cols.length} className="px-4 py-10 text-center text-sm text-zinc-400">Nenhum registro neste mês</td></tr>
+                    :rows.map((row,i)=><tr key={row.id||i} onClick={()=>onRowClick?.(row)} className={`hover:bg-zinc-50/60 transition-colors ${onRowClick?"cursor-pointer":""}`}>
                         {cols.map(c=><td key={c.key} className={`px-4 py-3 ${c.align==="right"?"text-right":""}`}>{c.render?c.render(row):row[c.key]}</td>)}
                     </tr>)}
                 </tbody>
             </table>
         </div>
+        {totalPages>1&&<div className="border-t border-zinc-100 px-4 py-2 flex items-center justify-between">
+            <span className="text-xs text-zinc-400">{data.length} registros</span>
+            <div className="flex items-center gap-1">
+                <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1} className="h-7 w-7 rounded-md flex items-center justify-center text-zinc-600 hover:bg-zinc-100 disabled:opacity-30 disabled:cursor-default transition-colors">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                </button>
+                <span className="text-xs text-zinc-500 tabular-nums px-2">{page} / {totalPages}</span>
+                <button onClick={()=>setPage(p=>Math.min(totalPages,p+1))} disabled={page===totalPages} className="h-7 w-7 rounded-md flex items-center justify-center text-zinc-600 hover:bg-zinc-100 disabled:opacity-30 disabled:cursor-default transition-colors">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
+            </div>
+        </div>}
         {footer&&<div className="border-t border-zinc-100 px-4 py-2.5 flex flex-wrap gap-6 text-xs text-zinc-400 bg-zinc-50/40">
             {footer.map((f,i)=><span key={i}><span className="uppercase tracking-wider">{f.label}</span>{" "}<span className="text-zinc-700 font-semibold">{f.value}</span></span>)}
         </div>}
-    </div>
-);
+    </div>);
+};
 
 const SH = ({title,onAdd,filters,activeFilters,onFilterChange}: {title: string; onAdd?: () => void; filters?: FilterDef[]; activeFilters?: Record<string, string>; onFilterChange?: (k: string, v: string) => void}) => {
     const ac = activeFilters ? Object.values(activeFilters).filter(v => v).length : 0;
