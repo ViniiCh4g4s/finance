@@ -554,7 +554,7 @@ export default function FinancasDashboard() {
                 onDelete={editingDV?requestDeleteDV:undefined}/>
             <GanhoModal open={modalGanho} onClose={closeAll} onSubmit={submitGanho} loading={loading}
                 fontes={configFontes}
-                initialData={editingGanho?{descricao:editingGanho.descricao,fonte:editingGanho.fonte,data:editingGanho.data,valor:String(editingGanho.valor)}:undefined}
+                initialData={editingGanho?{descricao:editingGanho.descricao,fonte:editingGanho.fonte,data:editingGanho.data,valor:String(editingGanho.valor),dataLimite:""}:undefined}
                 onDelete={editingGanho?requestDeleteGanho:undefined}/>
             <DespesaFixaModal open={modalFixa} onClose={closeAll} onSubmit={submitFixa} loading={loading}
                 categorias={configCategorias} formas={configFormas}
