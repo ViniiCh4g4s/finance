@@ -16,7 +16,7 @@
         <img src="https://github.com/ViniiCh4g4s/finance/actions/workflows/laravel.yml/badge.svg?branch=develop" alt="CI Develop">
     </a>
     <img src="https://img.shields.io/badge/PHP-8.4-777BB4?logo=php&logoColor=white" alt="PHP 8.4">
-    <img src="https://img.shields.io/badge/Laravel-11-FF2D20?logo=laravel&logoColor=white" alt="Laravel 11">
+    <img src="https://img.shields.io/badge/Laravel-12-FF2D20?logo=laravel&logoColor=white" alt="Laravel 11">
     <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white" alt="React 19">
     <img src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
     <img src="https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white" alt="Tailwind CSS">
@@ -62,7 +62,7 @@ O **Finance** é uma aplicacao web para controle financeiro pessoal, permitindo 
 
 | Camada | Tecnologia |
 |--------|-----------|
-| Backend | Laravel 11, PHP 8.4 |
+| Backend | Laravel 12, PHP 8.4 |
 | Frontend | React 19, TypeScript, Inertia.js |
 | Estilizacao | Tailwind CSS 4, shadcn/ui |
 | Banco de Dados | MySQL |
