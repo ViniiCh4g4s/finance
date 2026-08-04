@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Spinner } from "@/components/ui/spinner";
 import IconPicker from "@/components/icon-picker";
 import CurrencyInput from "@/components/currency-input";
@@ -7,6 +8,7 @@ export interface ConfigFormData {
     nome: string;
     icone: string;
     valor: string;
+    parcelavel?: boolean;
 }
 
 interface Props {
@@ -20,16 +22,15 @@ interface Props {
     valorLabel: string;
     valorPlaceholder?: string;
     defaultIcon?: string;
+    showParcelavel?: boolean;
 }
-
-const empty: ConfigFormData = { nome: "", icone: "Briefcase", valor: "" };
 
 const inputCls = "w-full h-9 px-3 rounded-md border border-zinc-200 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-950/10 focus:border-zinc-400 bg-white";
 
-export default function ConfigModal({ open, onClose, onSubmit, initialData, onDelete, loading, title, valorLabel, valorPlaceholder, defaultIcon }: Props) {
-    const def: ConfigFormData = { nome: "", icone: defaultIcon ?? "Briefcase", valor: "" };
+export default function ConfigModal({ open, onClose, onSubmit, initialData, onDelete, loading, title, valorLabel, valorPlaceholder, defaultIcon, showParcelavel }: Props) {
+    const def: ConfigFormData = { nome: "", icone: defaultIcon ?? "Briefcase", valor: "", parcelavel: false };
     const [form, setForm] = useState<ConfigFormData>(def);
-    const sf = (k: keyof ConfigFormData, v: string) => setForm(p => ({ ...p, [k]: v }));
+    const sf = (k: keyof ConfigFormData, v: string | boolean) => setForm(p => ({ ...p, [k]: v }));
     const editing = !!initialData;
 
     useEffect(() => {
@@ -67,6 +68,15 @@ export default function ConfigModal({ open, onClose, onSubmit, initialData, onDe
                         <label className="block text-sm font-medium text-zinc-700">{valorLabel}</label>
                         <CurrencyInput value={form.valor} onChange={v => sf("valor", v)} placeholder={valorPlaceholder} className={inputCls} />
                     </div>
+                    {showParcelavel && (
+                        <label className="flex items-start gap-3 rounded-md border border-zinc-200 px-3 py-2.5 cursor-pointer hover:bg-zinc-50 transition-colors">
+                            <Checkbox checked={!!form.parcelavel} onCheckedChange={v => sf("parcelavel", v === true)} disabled={loading} className="mt-0.5" />
+                            <span className="space-y-0.5">
+                                <span className="block text-sm font-medium text-zinc-700">Permite parcelamento</span>
+                                <span className="block text-xs text-zinc-400">Libera o campo de parcelas ao lançar uma despesa variável com esta forma.</span>
+                            </span>
+                        </label>
+                    )}
                     <div className="pt-1 flex gap-3">
                         {editing && onDelete && (
                             <button type="button" onClick={onDelete} disabled={loading} className="h-10 px-4 rounded-md border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 active:bg-red-100 transition-colors disabled:opacity-50">

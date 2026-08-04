@@ -34,7 +34,7 @@ interface Investimento { id: number; produto: string; empresa: string; valor: nu
 interface Meta { id: number; nome: string; icone: string | null; percent: number; valor: number; investido: number; faltante: number }
 interface FonteRenda { id: number; nome: string; icone: string | null; percent: number; metaAnual: number; receitaAnual: number }
 interface Categoria { id: number; nome: string; icone: string | null; pct: number; lim: number | null; desp: number }
-interface FormaPagamento { id: number; nome: string; icone: string | null; pct: number; lim: number; desp: number }
+interface FormaPagamento { id: number; nome: string; icone: string | null; pct: number; lim: number; desp: number; parcelavel: boolean }
 
 interface PageProps {
     auth: { user: { name: string } };
@@ -52,6 +52,7 @@ interface PageProps {
     configFontes: string[];
     configCategorias: string[];
     configFormas: string[];
+    configFormasParcelaveis: string[];
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -243,7 +244,7 @@ const yearOptions = Array.from({length: 5}, (_, i) => String(currentYear - 2 + i
 
 export default function FinancasDashboard() {
     const props = usePage<PageProps>().props;
-    const { auth, ano, balancoMensal, ganhos: dataGanhos, fixas: dataFixas, variaveis: dataVar, dividas: dataDividas, investimentos: dataInvest, metas: dataMetas, fontes: dataFontes, categorias: dataCategs, formas: dataFormas, configFontes, configCategorias, configFormas } = props;
+    const { auth, ano, balancoMensal, ganhos: dataGanhos, fixas: dataFixas, variaveis: dataVar, dividas: dataDividas, investimentos: dataInvest, metas: dataMetas, fontes: dataFontes, categorias: dataCategs, formas: dataFormas, configFontes, configCategorias, configFormas, configFormasParcelaveis } = props;
 
     const curQ = Math.floor(new Date().getMonth() / 4);
     const [qTab, setQTab] = useState(["1º Quadrimestre","2º Quadrimestre","3º Quadrimestre"][curQ]);
@@ -332,8 +333,9 @@ export default function FinancasDashboard() {
     };
     const submitForma=(data: ConfigFormData)=>{
         setLoading(true);
-        if(editingForma) router.put(formasPagamentoRoutes.update(editingForma.id).url, { nome: data.nome, icone: data.icone, limite_anual: data.valor }, rOpts);
-        else router.post(formasPagamentoRoutes.store().url, { nome: data.nome, icone: data.icone, limite_anual: data.valor }, rOpts);
+        const payload = { nome: data.nome, icone: data.icone, limite_anual: data.valor, parcelavel: !!data.parcelavel };
+        if(editingForma) router.put(formasPagamentoRoutes.update(editingForma.id).url, payload, rOpts);
+        else router.post(formasPagamentoRoutes.store().url, payload, rOpts);
     };
 
     const requestDelete = (url: string) => {
@@ -596,6 +598,7 @@ export default function FinancasDashboard() {
                             <div className="space-y-1.5">
                                 <div className="flex justify-between text-xs"><span className="text-zinc-400">Limite Anual</span><span className="font-mono text-zinc-600">{fmt(f.lim)}</span></div>
                                 <div className="flex justify-between text-xs"><span className="text-red-500">Despesa Anual</span><span className="font-mono text-red-500">{fmt(f.desp)}</span></div>
+                                {f.parcelavel&&<div className="pt-1"><B>Parcelável</B></div>}
                             </div>
                         </div>)}
                     </div>
@@ -603,7 +606,7 @@ export default function FinancasDashboard() {
             </div>
 
             <DespesaVariavelModal key={editingDV?`edit-${editingDV.id}`:copyDV?"copy":"new"} open={modal} onClose={closeAll} onSubmit={submitDV} loading={loading}
-                categorias={configCategorias} formas={configFormas}
+                categorias={configCategorias} formas={configFormas} formasParcelaveis={configFormasParcelaveis}
                 initialData={editingDV?{descricao:editingDV.descricao,categoria:editingDV.categoria,valor:String(editingDV.valor),data:editingDV.data,forma:editingDV.forma,balanco:editingDV.balanco,parcelas:"1",dataLimite:""}:undefined}
                 copyData={copyDV??undefined}
                 onDelete={editingDV?requestDeleteDV:undefined}
@@ -637,8 +640,8 @@ export default function FinancasDashboard() {
                 initialData={editingCategoria?{nome:editingCategoria.nome,icone:editingCategoria.icone||"ShoppingBag",valor:editingCategoria.lim!=null?String(editingCategoria.lim):""}:undefined}
                 onDelete={editingCategoria?requestDeleteCategoria:undefined}/>
             <ConfigModal open={modalForma} onClose={closeAll} onSubmit={submitForma} loading={loading}
-                title="Forma de Pagamento" valorLabel="Limite Anual (R$)" valorPlaceholder="0,00" defaultIcon="CreditCard"
-                initialData={editingForma?{nome:editingForma.nome,icone:editingForma.icone||"CreditCard",valor:String(editingForma.lim||"")}:undefined}
+                title="Forma de Pagamento" valorLabel="Limite Anual (R$)" valorPlaceholder="0,00" defaultIcon="CreditCard" showParcelavel
+                initialData={editingForma?{nome:editingForma.nome,icone:editingForma.icone||"CreditCard",valor:String(editingForma.lim||""),parcelavel:editingForma.parcelavel}:undefined}
                 onDelete={editingForma?requestDeleteForma:undefined}/>
 
             {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO */}

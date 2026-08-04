@@ -92,3 +92,55 @@ test('store validates required fields', function () {
         ->post(route('formas-pagamento.store'), ['limite_anual' => -1])
         ->assertSessionHasErrors(['nome', 'limite_anual']);
 });
+
+test('store saves the parcelavel flag', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->post(route('formas-pagamento.store'), [
+            'nome'         => 'Cartão Mercado Pago',
+            'icone'        => 'CreditCard',
+            'limite_anual' => 15000,
+            'parcelavel'   => true,
+        ])
+        ->assertRedirect();
+
+    $forma = $user->formasPagamento()->firstWhere('nome', 'Cartão Mercado Pago');
+    expect($forma->parcelavel)->toBeTrue();
+});
+
+test('forma de pagamento defaults to nao parcelavel', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->post(route('formas-pagamento.store'), ['nome' => 'Pix'])
+        ->assertRedirect();
+
+    expect($user->formasPagamento()->firstWhere('nome', 'Pix')->parcelavel)->toBeFalse();
+});
+
+test('update toggles the parcelavel flag', function () {
+    $user  = User::factory()->create();
+    $forma = $user->formasPagamento()->create(['nome' => 'Cartão Mercado Pago', 'parcelavel' => true]);
+
+    $this->actingAs($user)
+        ->put(route('formas-pagamento.update', $forma->id), [
+            'nome'       => 'Cartão Mercado Pago',
+            'parcelavel' => false,
+        ])
+        ->assertRedirect();
+
+    expect($forma->refresh()->parcelavel)->toBeFalse();
+});
+
+test('home exposes only parcelavel formas in configFormasParcelaveis', function () {
+    $user = User::factory()->create();
+    $user->formasPagamento()->create(['nome' => 'Cartão Mercado Pago', 'parcelavel' => true]);
+    $user->formasPagamento()->create(['nome' => 'Pix', 'parcelavel' => false]);
+
+    $this->actingAs($user)
+        ->get(route('home'))
+        ->assertInertia(fn ($page) => $page
+            ->where('configFormas', ['Cartão Mercado Pago', 'Pix'])
+            ->where('configFormasParcelaveis', ['Cartão Mercado Pago']));
+});

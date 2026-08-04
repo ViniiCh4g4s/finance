@@ -85,7 +85,7 @@ class HomeController extends Controller
             $lim  = $f->limite_anual ? (float) $f->limite_anual : 0;
             $pct  = $lim > 0 ? round(($desp / $lim) * 100) : 0;
 
-            return ['id' => $f->id, 'nome' => $f->nome, 'icone' => $f->icone, 'pct' => $pct, 'lim' => $lim, 'desp' => $desp];
+            return ['id' => $f->id, 'nome' => $f->nome, 'icone' => $f->icone, 'pct' => $pct, 'lim' => $lim, 'desp' => $desp, 'parcelavel' => (bool) $f->parcelavel];
         });
 
         $fmtDate = fn ($d) => $d ? Carbon::parse($d)->format('d/m/Y') : '';
@@ -166,6 +166,8 @@ class HomeController extends Controller
             'configFontes'     => $configFontes->pluck('nome')->values(),
             'configCategorias' => $configCategorias->pluck('nome')->values(),
             'configFormas'     => $configFormas->pluck('nome')->values(),
+            // Nomes das formas que permitem parcelamento (libera o campo "Parcelas")
+            'configFormasParcelaveis' => $configFormas->where('parcelavel', true)->pluck('nome')->values(),
         ]);
     }
 }
