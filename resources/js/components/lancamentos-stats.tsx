@@ -1,29 +1,32 @@
-interface Row {
-    descricao: string;
-    categoria: string;
-    valor: number;
-    data: string;
-    forma: string;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type StatsRow = Record<string, any> & { descricao: string; valor: number; data: string };
+
+export interface TileDef {
+    label: string;
+    value: string;
+    hint?: string;
 }
 
 interface Props {
-    rows: Row[];
+    rows: StatsRow[];
     mesIndex: number;
     ano: number;
+    dims: { titulo: string; chave: string }[];
+    tilesExtras?: TileDef[];
 }
 
 const fmt = (v: number): string => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-const somaPor = (rows: Row[], key: "categoria" | "forma"): [string, number][] => {
+const somaPor = (rows: StatsRow[], chave: string): [string, number][] => {
     const map = new Map<string, number>();
     for (const r of rows) {
-        const k = r[key] || "—";
+        const k = String(r[chave] || "—");
         map.set(k, (map.get(k) ?? 0) + r.valor);
     }
     return [...map.entries()].sort((a, b) => b[1] - a[1]);
 };
 
-const Tile = ({ label, value, hint }: { label: string; value: string; hint?: string }) => (
+const Tile = ({ label, value, hint }: TileDef) => (
     <div className="px-5 py-4">
         <p className="text-[11px] text-zinc-400 uppercase tracking-wider">{label}</p>
         <p className="text-xl font-semibold text-zinc-900 mt-1">{value}</p>
@@ -57,13 +60,18 @@ const Barras = ({ titulo, itens, total }: { titulo: string; itens: [string, numb
     );
 };
 
-export default function DespesasVariaveisStats({ rows, mesIndex, ano }: Props) {
+export default function LancamentosStats({ rows, mesIndex, ano, dims, tilesExtras }: Props) {
     const total = rows.reduce((s, r) => s + r.valor, 0);
     const media = rows.length > 0 ? total / rows.length : 0;
-    const maior = rows.reduce<Row | null>((m, r) => (m === null || r.valor > m.valor ? r : m), null);
+    const maior = rows.reduce<StatsRow | null>((m, r) => (m === null || r.valor > m.valor ? r : m), null);
 
-    const porCategoria = somaPor(rows, "categoria");
-    const porForma = somaPor(rows, "forma");
+    const tiles: TileDef[] = [
+        { label: "Total no mês", value: fmt(total) },
+        { label: "Registros", value: String(rows.length) },
+        { label: "Média por registro", value: fmt(media) },
+        { label: "Maior gasto", value: fmt(maior?.valor ?? 0), hint: maior?.descricao },
+        ...(tilesExtras ?? []),
+    ];
 
     const diasNoMes = new Date(ano, mesIndex + 1, 0).getDate();
     const porDia = new Array<number>(diasNoMes).fill(0);
@@ -85,17 +93,13 @@ export default function DespesasVariaveisStats({ rows, mesIndex, ano }: Props) {
     return (
         <div className="rounded-xl border border-zinc-200 overflow-hidden bg-white shadow-sm">
             {/* KPIs do mês */}
-            <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-zinc-100 border-b border-zinc-100">
-                <Tile label="Total no mês" value={fmt(total)} />
-                <Tile label="Registros" value={String(rows.length)} />
-                <Tile label="Média por registro" value={fmt(media)} />
-                <Tile label="Maior gasto" value={fmt(maior?.valor ?? 0)} hint={maior?.descricao} />
+            <div className={`grid grid-cols-2 ${tiles.length > 4 ? "md:grid-cols-3" : "md:grid-cols-4"} divide-x divide-zinc-100 border-b border-zinc-100`}>
+                {tiles.map(t => <Tile key={t.label} {...t} />)}
             </div>
 
-            {/* Rankings por categoria e forma */}
-            <div className="grid grid-cols-1 md:grid-cols-2 md:divide-x divide-zinc-100 border-b border-zinc-100">
-                <Barras titulo="Gastos por categoria" itens={porCategoria} total={total} />
-                <Barras titulo="Gastos por forma de pagamento" itens={porForma} total={total} />
+            {/* Rankings por dimensão (categoria, forma...) */}
+            <div className={`grid grid-cols-1 ${dims.length > 1 ? "md:grid-cols-2" : ""} md:divide-x divide-zinc-100 border-b border-zinc-100`}>
+                {dims.map(d => <Barras key={d.chave} titulo={d.titulo} itens={somaPor(rows, d.chave)} total={total} />)}
             </div>
 
             {/* Gastos por dia do mês */}
