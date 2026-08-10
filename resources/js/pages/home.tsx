@@ -16,6 +16,7 @@ import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import DespesaVariavelModal, { type DespesaFormData } from "@/components/despesa-variavel-modal";
+import DespesasVariaveisStats from "@/components/despesas-variaveis-stats";
 import GanhoModal, { type GanhoFormData } from "@/components/ganho-modal";
 import DespesaFixaModal, { type DespesaFixaFormData } from "@/components/despesa-fixa-modal";
 import DividaModal, { type DividaFormData } from "@/components/divida-modal";
@@ -201,12 +202,13 @@ const Tbl = ({cols,data,footer,onRowClick,onDeleteSelected}: {cols: Column[]; da
     </div>);
 };
 
-const SH = ({title,onAdd,filters,activeFilters,onFilterChange}: {title: string; onAdd?: () => void; filters?: FilterDef[]; activeFilters?: Record<string, string>; onFilterChange?: (k: string, v: string) => void}) => {
+const SH = ({title,onAdd,filters,activeFilters,onFilterChange,extra}: {title: string; onAdd?: () => void; filters?: FilterDef[]; activeFilters?: Record<string, string>; onFilterChange?: (k: string, v: string) => void; extra?: ReactNode}) => {
     const ac = activeFilters ? Object.values(activeFilters).filter(v => v).length : 0;
     return (
         <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-zinc-900 tracking-tight">{title}</h2>
             <div className="flex items-center gap-2">
+                {extra}
                 {filters && filters.length > 0 && onFilterChange && (
                     <Popover>
                         <PopoverTrigger asChild>
@@ -259,6 +261,15 @@ export default function FinancasDashboard() {
     const [gM,setGM]=useState(currentMonth);
     const [fM,setFM]=useState(currentMonth);
     const [vM,setVM]=useState(currentMonth);
+    const [vStats,setVStats]=useState(false);
+    const [vFlipping,setVFlipping]=useState(false);
+    // Vira a "página" da tabela: troca o conteúdo no meio do giro, quando está de perfil
+    const toggleVStats=()=>{
+        if(vFlipping) return;
+        setVFlipping(true);
+        window.setTimeout(()=>setVStats(s=>!s),250);
+        window.setTimeout(()=>setVFlipping(false),500);
+    };
     const [dM,setDM]=useState(currentMonth);
     const [iM,setIM]=useState(currentMonth);
     const [gFilters,setGFilters]=useState<Record<string,string>>({});
@@ -524,14 +535,28 @@ export default function FinancasDashboard() {
                 </section>
 
                 {/* DESPESAS VARIÁVEIS */}
-                <section><SH title="Despesas Variáveis" onAdd={()=>{setEditingDV(null);setCopyDV(null);setModal(true);}} filters={vFD} activeFilters={vFilters} onFilterChange={(k,v)=>setVFilters(p=>({...p,[k]:v}))}/><MT a={vM} o={setVM}/>
-                    <div className="mt-3"><Tbl cols={[
-                        {key:"descricao",label:"Descrição",render:r=><Desc t={r.descricao} n={r.grupoTotal}/>},
-                        {key:"categoria",label:"Categoria",render:r=><B>{r.categoria}</B>},
-                        {key:"valor",label:"Valor",align:"right",render:r=><span className="font-mono">{fmt(r.valor)}</span>},
-                        {key:"data",label:"Data",render:r=><span className="text-zinc-500">{r.data}</span>},
-                        {key:"forma",label:"Forma de Pagamento",render:r=>r.forma?<B>{r.forma}</B>:<span className="text-zinc-300">—</span>},
-                    ]} data={vF} footer={[{label:"Contagem",value:vF.length},{label:"Soma",value:fmt(vF.reduce((s,d)=>s+d.valor,0))}]} onRowClick={openEditDV} onDeleteSelected={ids=>bulkDelete(despesasVariaveis.bulkDestroy().url,ids)}/></div>
+                <section><SH title="Despesas Variáveis" onAdd={()=>{setEditingDV(null);setCopyDV(null);setModal(true);}} filters={vFD} activeFilters={vFilters} onFilterChange={(k,v)=>setVFilters(p=>({...p,[k]:v}))}
+                    extra={
+                        <button onClick={toggleVStats} title={vStats?"Ver registros":"Ver estatísticas"} className={`inline-flex items-center justify-center h-8 w-8 rounded-md border transition-colors ${vStats?"border-zinc-900 bg-zinc-900 text-white":"border-zinc-200 text-zinc-600 hover:bg-zinc-50"}`}>
+                            {vStats
+                                ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
+                                : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 16v-5"/><path d="M12 16V8"/><path d="M17 16v-8"/></svg>}
+                        </button>
+                    }/><MT a={vM} o={setVM}/>
+                    <div className="mt-3" style={{perspective:"1400px"}}>
+                        <div style={vFlipping?{animation:"vflip .5s ease-in-out"}:undefined}>
+                            {vStats
+                                ? <DespesasVariaveisStats rows={vF} mesIndex={MONTHS.indexOf(vM as typeof MONTHS[number])} ano={ano}/>
+                                : <Tbl cols={[
+                                    {key:"descricao",label:"Descrição",render:r=><Desc t={r.descricao} n={r.grupoTotal}/>},
+                                    {key:"categoria",label:"Categoria",render:r=><B>{r.categoria}</B>},
+                                    {key:"valor",label:"Valor",align:"right",render:r=><span className="font-mono">{fmt(r.valor)}</span>},
+                                    {key:"data",label:"Data",render:r=><span className="text-zinc-500">{r.data}</span>},
+                                    {key:"forma",label:"Forma de Pagamento",render:r=>r.forma?<B>{r.forma}</B>:<span className="text-zinc-300">—</span>},
+                                ]} data={vF} footer={[{label:"Contagem",value:vF.length},{label:"Soma",value:fmt(vF.reduce((s,d)=>s+d.valor,0))}]} onRowClick={openEditDV} onDeleteSelected={ids=>bulkDelete(despesasVariaveis.bulkDestroy().url,ids)}/>}
+                        </div>
+                    </div>
+                    <style>{`@keyframes vflip{0%{transform:rotateY(0)}50%{transform:rotateY(90deg)}100%{transform:rotateY(0)}}`}</style>
                 </section>
 
                 {/* DÍVIDAS */}
