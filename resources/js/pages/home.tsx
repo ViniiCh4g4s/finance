@@ -16,6 +16,7 @@ import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import DespesaVariavelModal, { type DespesaFormData } from "@/components/despesa-variavel-modal";
+import DespesasVariaveisStats from "@/components/despesas-variaveis-stats";
 import GanhoModal, { type GanhoFormData } from "@/components/ganho-modal";
 import DespesaFixaModal, { type DespesaFixaFormData } from "@/components/despesa-fixa-modal";
 import DividaModal, { type DividaFormData } from "@/components/divida-modal";
@@ -26,15 +27,15 @@ import ConfigModal, { type ConfigFormData } from "@/components/config-modal";
 /* ── TYPES ─────────────────────────────────────────────────────────────────── */
 
 interface BalancoMensal { mes: string; receita: number; despesa: number }
-interface Ganho { id: number; descricao: string; fonte: string; data: string; valor: number; balanco: string }
-interface DespesaFixa { id: number; descricao: string; categoria: string; valor: number; vencimento: string; status: string; dataPgto: string; forma: string; balanco: string }
-interface DespesaVariavel { id: number; descricao: string; categoria: string; valor: number; data: string; balanco: string; forma: string }
-interface Divida { id: number; descricao: string; destino: string; valor: number; vencimento: string; status: string; balanco: string }
-interface Investimento { id: number; produto: string; empresa: string; valor: number; quantidade: number; valorTotal: number; tipoAtivo: string; provento: number; frequencia: string; data: string; balanco: string }
+interface Ganho { id: number; descricao: string; fonte: string; data: string; valor: number; balanco: string ; grupoId: string | null; grupoTotal: number }
+interface DespesaFixa { id: number; descricao: string; categoria: string; valor: number; vencimento: string; status: string; dataPgto: string; forma: string; balanco: string ; grupoId: string | null; grupoTotal: number }
+interface DespesaVariavel { id: number; descricao: string; categoria: string; valor: number; data: string; balanco: string; forma: string ; grupoId: string | null; grupoTotal: number }
+interface Divida { id: number; descricao: string; destino: string; valor: number; vencimento: string; status: string; balanco: string ; grupoId: string | null; grupoTotal: number }
+interface Investimento { id: number; produto: string; empresa: string; valor: number; quantidade: number; valorTotal: number; tipoAtivo: string; provento: number; frequencia: string; data: string; balanco: string ; grupoId: string | null; grupoTotal: number }
 interface Meta { id: number; nome: string; icone: string | null; percent: number; valor: number; investido: number; faltante: number }
 interface FonteRenda { id: number; nome: string; icone: string | null; percent: number; metaAnual: number; receitaAnual: number }
 interface Categoria { id: number; nome: string; icone: string | null; pct: number; lim: number | null; desp: number }
-interface FormaPagamento { id: number; nome: string; icone: string | null; pct: number; lim: number; desp: number }
+interface FormaPagamento { id: number; nome: string; icone: string | null; pct: number; lim: number; desp: number; parcelavel: boolean }
 
 interface PageProps {
     auth: { user: { name: string } };
@@ -52,6 +53,7 @@ interface PageProps {
     configFontes: string[];
     configCategorias: string[];
     configFormas: string[];
+    configFormasParcelaveis: string[];
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -115,6 +117,14 @@ const B = ({children,v="default"}: {children: ReactNode; v?: BadgeVariant}) => {
 };
 
 const SB = ({s}: {s: string}) => s==="Pago"?<B v="success">● Pago</B>:<B v="danger">● Pendente</B>;
+
+// Marca lançamentos criados em lote (recorrência, parcelamento ou assinatura)
+const GI = ({n}: {n: number}) => n>1?(
+    <span title={`${n} lançamentos vinculados`} className="text-zinc-300 shrink-0">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
+    </span>
+):null;
+const Desc = ({t,n}: {t: string; n: number}) => <span className="font-medium text-zinc-900 inline-flex items-center gap-1.5">{t}<GI n={n}/></span>;
 
 const TabsNav = ({tabs,active,onChange}: {tabs: readonly string[]; active: string; onChange: (tab: string) => void}) => (
     <div className="flex items-center gap-1 overflow-x-auto pb-1" style={{scrollbarWidth:"none"}}>
@@ -192,12 +202,13 @@ const Tbl = ({cols,data,footer,onRowClick,onDeleteSelected}: {cols: Column[]; da
     </div>);
 };
 
-const SH = ({title,onAdd,filters,activeFilters,onFilterChange}: {title: string; onAdd?: () => void; filters?: FilterDef[]; activeFilters?: Record<string, string>; onFilterChange?: (k: string, v: string) => void}) => {
+const SH = ({title,onAdd,filters,activeFilters,onFilterChange,extra}: {title: string; onAdd?: () => void; filters?: FilterDef[]; activeFilters?: Record<string, string>; onFilterChange?: (k: string, v: string) => void; extra?: ReactNode}) => {
     const ac = activeFilters ? Object.values(activeFilters).filter(v => v).length : 0;
     return (
         <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-zinc-900 tracking-tight">{title}</h2>
             <div className="flex items-center gap-2">
+                {extra}
                 {filters && filters.length > 0 && onFilterChange && (
                     <Popover>
                         <PopoverTrigger asChild>
@@ -243,13 +254,22 @@ const yearOptions = Array.from({length: 5}, (_, i) => String(currentYear - 2 + i
 
 export default function FinancasDashboard() {
     const props = usePage<PageProps>().props;
-    const { auth, ano, balancoMensal, ganhos: dataGanhos, fixas: dataFixas, variaveis: dataVar, dividas: dataDividas, investimentos: dataInvest, metas: dataMetas, fontes: dataFontes, categorias: dataCategs, formas: dataFormas, configFontes, configCategorias, configFormas } = props;
+    const { auth, ano, balancoMensal, ganhos: dataGanhos, fixas: dataFixas, variaveis: dataVar, dividas: dataDividas, investimentos: dataInvest, metas: dataMetas, fontes: dataFontes, categorias: dataCategs, formas: dataFormas, configFontes, configCategorias, configFormas, configFormasParcelaveis } = props;
 
     const curQ = Math.floor(new Date().getMonth() / 4);
     const [qTab, setQTab] = useState(["1º Quadrimestre","2º Quadrimestre","3º Quadrimestre"][curQ]);
     const [gM,setGM]=useState(currentMonth);
     const [fM,setFM]=useState(currentMonth);
     const [vM,setVM]=useState(currentMonth);
+    const [vStats,setVStats]=useState(false);
+    const [vFlipping,setVFlipping]=useState(false);
+    // Vira a "página" da tabela: troca o conteúdo no meio do giro, quando está de perfil
+    const toggleVStats=()=>{
+        if(vFlipping) return;
+        setVFlipping(true);
+        window.setTimeout(()=>setVStats(s=>!s),250);
+        window.setTimeout(()=>setVFlipping(false),500);
+    };
     const [dM,setDM]=useState(currentMonth);
     const [iM,setIM]=useState(currentMonth);
     const [gFilters,setGFilters]=useState<Record<string,string>>({});
@@ -278,37 +298,46 @@ export default function FinancasDashboard() {
     const [editingForma,setEditingForma]=useState<FormaPagamento|null>(null);
 
     const [loading, setLoading] = useState(false);
-    const [deleteConfirm, setDeleteConfirm] = useState<{ action: () => void; message?: string } | null>(null);
+    type EscopoExclusao = "registro" | "grupo";
+    const [deleteConfirm, setDeleteConfirm] = useState<{ action: (escopo?: EscopoExclusao) => void; message?: string; grupoTotal?: number } | null>(null);
+    const [updateConfirm, setUpdateConfirm] = useState<{ action: (escopo: EscopoExclusao) => void; grupoTotal: number } | null>(null);
     const [deleting, setDeleting] = useState(false);
 
-    const closeAll=()=>{setModal(false);setModalGanho(false);setModalFixa(false);setModalDivida(false);setModalInvest(false);setModalMeta(false);setModalFonte(false);setModalCategoria(false);setModalForma(false);setEditingDV(null);setCopyDV(null);setEditingGanho(null);setEditingFixa(null);setEditingDivida(null);setEditingInvest(null);setEditingMeta(null);setEditingFonte(null);setEditingCategoria(null);setEditingForma(null);};
+    const closeAll=()=>{setModal(false);setModalGanho(false);setModalFixa(false);setModalDivida(false);setModalInvest(false);setModalMeta(false);setModalFonte(false);setModalCategoria(false);setModalForma(false);setEditingDV(null);setCopyDV(null);setEditingGanho(null);setEditingFixa(null);setEditingDivida(null);setEditingInvest(null);setEditingMeta(null);setEditingFonte(null);setEditingCategoria(null);setEditingForma(null);setUpdateConfirm(null);};
 
     const rOpts = { preserveScroll: true, preserveState: true, onSuccess: closeAll, onFinish: () => setLoading(false) };
 
+    // Edição de lançamento vinculado: pergunta se as mudanças valem só para este
+    // registro ou para todos os do grupo (o backend replica só o que mudou)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const putComEscopo=(url: string, data: Record<string, any>, grupoTotal: number)=>{
+        const send=(escopo: "registro" | "grupo")=>{
+            setLoading(true);
+            router.put(url, { ...data, escopo }, rOpts);
+        };
+        if(grupoTotal>1) setUpdateConfirm({ grupoTotal, action: send });
+        else send("registro");
+    };
+
     const submitDV=(data: DespesaFormData)=>{
-        setLoading(true);
-        if(editingDV) router.put(despesasVariaveis.update(editingDV.id).url, data, rOpts);
-        else router.post(despesasVariaveis.store().url, data, rOpts);
+        if(editingDV) putComEscopo(despesasVariaveis.update(editingDV.id).url, data, editingDV.grupoTotal);
+        else {setLoading(true); router.post(despesasVariaveis.store().url, data, rOpts);}
     };
     const submitGanho=(data: GanhoFormData)=>{
-        setLoading(true);
-        if(editingGanho) router.put(ganhos.update(editingGanho.id).url, data, rOpts);
-        else router.post(ganhos.store().url, data, rOpts);
+        if(editingGanho) putComEscopo(ganhos.update(editingGanho.id).url, data, editingGanho.grupoTotal);
+        else {setLoading(true); router.post(ganhos.store().url, data, rOpts);}
     };
     const submitFixa=(data: DespesaFixaFormData)=>{
-        setLoading(true);
-        if(editingFixa) router.put(despesasFixas.update(editingFixa.id).url, data, rOpts);
-        else router.post(despesasFixas.store().url, data, rOpts);
+        if(editingFixa) putComEscopo(despesasFixas.update(editingFixa.id).url, data, editingFixa.grupoTotal);
+        else {setLoading(true); router.post(despesasFixas.store().url, data, rOpts);}
     };
     const submitDivida=(data: DividaFormData)=>{
-        setLoading(true);
-        if(editingDivida) router.put(dividas.update(editingDivida.id).url, data, rOpts);
-        else router.post(dividas.store().url, data, rOpts);
+        if(editingDivida) putComEscopo(dividas.update(editingDivida.id).url, data, editingDivida.grupoTotal);
+        else {setLoading(true); router.post(dividas.store().url, data, rOpts);}
     };
     const submitInvest=(data: InvestimentoFormData)=>{
-        setLoading(true);
-        if(editingInvest) router.put(investimentos.update(editingInvest.id).url, data, rOpts);
-        else router.post(investimentos.store().url, data, rOpts);
+        if(editingInvest) putComEscopo(investimentos.update(editingInvest.id).url, data, editingInvest.grupoTotal);
+        else {setLoading(true); router.post(investimentos.store().url, data, rOpts);}
     };
     const submitMeta=(data: MetaFormData)=>{
         setLoading(true);
@@ -332,16 +361,21 @@ export default function FinancasDashboard() {
     };
     const submitForma=(data: ConfigFormData)=>{
         setLoading(true);
-        if(editingForma) router.put(formasPagamentoRoutes.update(editingForma.id).url, { nome: data.nome, icone: data.icone, limite_anual: data.valor }, rOpts);
-        else router.post(formasPagamentoRoutes.store().url, { nome: data.nome, icone: data.icone, limite_anual: data.valor }, rOpts);
+        const payload = { nome: data.nome, icone: data.icone, limite_anual: data.valor, parcelavel: !!data.parcelavel };
+        if(editingForma) router.put(formasPagamentoRoutes.update(editingForma.id).url, payload, rOpts);
+        else router.post(formasPagamentoRoutes.store().url, payload, rOpts);
     };
 
-    const requestDelete = (url: string) => {
+    // grupoTotal > 1 => lançamento veio de recorrência/parcelamento/assinatura,
+    // então o usuário escolhe entre excluir só este ou todos os vinculados
+    const requestDelete = (url: string, grupoTotal = 1) => {
         closeAll();
         setDeleteConfirm({
-            action: () => {
+            grupoTotal,
+            action: (escopo: EscopoExclusao = "registro") => {
                 setDeleting(true);
                 router.delete(url, {
+                    data: { escopo },
                     preserveScroll: true,
                     preserveState: true,
                     onSuccess: () => setDeleteConfirm(null),
@@ -369,11 +403,11 @@ export default function FinancasDashboard() {
         });
     };
 
-    const requestDeleteDV=()=>{if(editingDV) requestDelete(despesasVariaveis.destroy(editingDV.id).url);};
-    const requestDeleteGanho=()=>{if(editingGanho) requestDelete(ganhos.destroy(editingGanho.id).url);};
-    const requestDeleteFixa=()=>{if(editingFixa) requestDelete(despesasFixas.destroy(editingFixa.id).url);};
-    const requestDeleteDivida=()=>{if(editingDivida) requestDelete(dividas.destroy(editingDivida.id).url);};
-    const requestDeleteInvest=()=>{if(editingInvest) requestDelete(investimentos.destroy(editingInvest.id).url);};
+    const requestDeleteDV=()=>{if(editingDV) requestDelete(despesasVariaveis.destroy(editingDV.id).url,editingDV.grupoTotal);};
+    const requestDeleteGanho=()=>{if(editingGanho) requestDelete(ganhos.destroy(editingGanho.id).url,editingGanho.grupoTotal);};
+    const requestDeleteFixa=()=>{if(editingFixa) requestDelete(despesasFixas.destroy(editingFixa.id).url,editingFixa.grupoTotal);};
+    const requestDeleteDivida=()=>{if(editingDivida) requestDelete(dividas.destroy(editingDivida.id).url,editingDivida.grupoTotal);};
+    const requestDeleteInvest=()=>{if(editingInvest) requestDelete(investimentos.destroy(editingInvest.id).url,editingInvest.grupoTotal);};
     const requestDeleteMeta=()=>{if(editingMeta) requestDelete(metas.destroy(editingMeta.id).url);};
     const requestDeleteFonte=()=>{if(editingFonte) requestDelete(fontesRendaRoutes.destroy(editingFonte.id).url);};
     const requestDeleteCategoria=()=>{if(editingCategoria) requestDelete(categoriasRoutes.destroy(editingCategoria.id).url);};
@@ -480,7 +514,7 @@ export default function FinancasDashboard() {
                 {/* GANHOS */}
                 <section><SH title="Ganhos" onAdd={()=>{setEditingGanho(null);setModalGanho(true);}} filters={gFD} activeFilters={gFilters} onFilterChange={(k,v)=>setGFilters(p=>({...p,[k]:v}))}/><MT a={gM} o={setGM}/>
                     <div className="mt-3"><Tbl cols={[
-                        {key:"descricao",label:"Descrição",render:r=><span className="font-medium text-zinc-900">{r.descricao}</span>},
+                        {key:"descricao",label:"Descrição",render:r=><Desc t={r.descricao} n={r.grupoTotal}/>},
                         {key:"fonte",label:"Fonte de Renda",render:r=><B>{r.fonte}</B>},
                         {key:"data",label:"Data",render:r=><span className="text-zinc-500">{r.data}</span>},
                         {key:"valor",label:"Valor",align:"right",render:r=><span className="font-mono font-semibold text-emerald-600">{fmt(r.valor)}</span>},
@@ -490,7 +524,7 @@ export default function FinancasDashboard() {
                 {/* DESPESAS FIXAS */}
                 <section><SH title="Despesas Fixas" onAdd={()=>{setEditingFixa(null);setModalFixa(true);}} filters={fFD} activeFilters={fFilters} onFilterChange={(k,v)=>setFFilters(p=>({...p,[k]:v}))}/><MT a={fM} o={setFM}/>
                     <div className="mt-3"><Tbl cols={[
-                        {key:"descricao",label:"Descrição",render:r=><span className="font-medium text-zinc-900">{r.descricao}</span>},
+                        {key:"descricao",label:"Descrição",render:r=><Desc t={r.descricao} n={r.grupoTotal}/>},
                         {key:"categoria",label:"Categoria",render:r=><B>{r.categoria}</B>},
                         {key:"valor",label:"Valor",align:"right",render:r=><span className="font-mono">{fmt(r.valor)}</span>},
                         {key:"vencimento",label:"Vencimento",render:r=><span className="text-zinc-500">{r.vencimento}</span>},
@@ -501,20 +535,34 @@ export default function FinancasDashboard() {
                 </section>
 
                 {/* DESPESAS VARIÁVEIS */}
-                <section><SH title="Despesas Variáveis" onAdd={()=>{setEditingDV(null);setCopyDV(null);setModal(true);}} filters={vFD} activeFilters={vFilters} onFilterChange={(k,v)=>setVFilters(p=>({...p,[k]:v}))}/><MT a={vM} o={setVM}/>
-                    <div className="mt-3"><Tbl cols={[
-                        {key:"descricao",label:"Descrição",render:r=><span className="font-medium text-zinc-900">{r.descricao}</span>},
-                        {key:"categoria",label:"Categoria",render:r=><B>{r.categoria}</B>},
-                        {key:"valor",label:"Valor",align:"right",render:r=><span className="font-mono">{fmt(r.valor)}</span>},
-                        {key:"data",label:"Data",render:r=><span className="text-zinc-500">{r.data}</span>},
-                        {key:"forma",label:"Forma de Pagamento",render:r=>r.forma?<B>{r.forma}</B>:<span className="text-zinc-300">—</span>},
-                    ]} data={vF} footer={[{label:"Contagem",value:vF.length},{label:"Soma",value:fmt(vF.reduce((s,d)=>s+d.valor,0))}]} onRowClick={openEditDV} onDeleteSelected={ids=>bulkDelete(despesasVariaveis.bulkDestroy().url,ids)}/></div>
+                <section><SH title="Despesas Variáveis" onAdd={()=>{setEditingDV(null);setCopyDV(null);setModal(true);}} filters={vFD} activeFilters={vFilters} onFilterChange={(k,v)=>setVFilters(p=>({...p,[k]:v}))}
+                    extra={
+                        <button onClick={toggleVStats} title={vStats?"Ver registros":"Ver estatísticas"} className={`inline-flex items-center justify-center h-8 w-8 rounded-md border transition-colors ${vStats?"border-zinc-900 bg-zinc-900 text-white":"border-zinc-200 text-zinc-600 hover:bg-zinc-50"}`}>
+                            {vStats
+                                ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
+                                : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 16v-5"/><path d="M12 16V8"/><path d="M17 16v-8"/></svg>}
+                        </button>
+                    }/><MT a={vM} o={setVM}/>
+                    <div className="mt-3" style={{perspective:"1400px"}}>
+                        <div style={vFlipping?{animation:"vflip .5s ease-in-out"}:undefined}>
+                            {vStats
+                                ? <DespesasVariaveisStats rows={vF} mesIndex={MONTHS.indexOf(vM as typeof MONTHS[number])} ano={ano}/>
+                                : <Tbl cols={[
+                                    {key:"descricao",label:"Descrição",render:r=><Desc t={r.descricao} n={r.grupoTotal}/>},
+                                    {key:"categoria",label:"Categoria",render:r=><B>{r.categoria}</B>},
+                                    {key:"valor",label:"Valor",align:"right",render:r=><span className="font-mono">{fmt(r.valor)}</span>},
+                                    {key:"data",label:"Data",render:r=><span className="text-zinc-500">{r.data}</span>},
+                                    {key:"forma",label:"Forma de Pagamento",render:r=>r.forma?<B>{r.forma}</B>:<span className="text-zinc-300">—</span>},
+                                ]} data={vF} footer={[{label:"Contagem",value:vF.length},{label:"Soma",value:fmt(vF.reduce((s,d)=>s+d.valor,0))}]} onRowClick={openEditDV} onDeleteSelected={ids=>bulkDelete(despesasVariaveis.bulkDestroy().url,ids)}/>}
+                        </div>
+                    </div>
+                    <style>{`@keyframes vflip{0%{transform:rotateY(0)}50%{transform:rotateY(90deg)}100%{transform:rotateY(0)}}`}</style>
                 </section>
 
                 {/* DÍVIDAS */}
                 <section><SH title="Dívidas" onAdd={()=>{setEditingDivida(null);setModalDivida(true);}} filters={dFD} activeFilters={dFilters} onFilterChange={(k,v)=>setDFilters(p=>({...p,[k]:v}))}/><MT a={dM} o={setDM}/>
                     <div className="mt-3"><Tbl cols={[
-                        {key:"descricao",label:"Descrição",render:r=><span className="font-medium text-zinc-900">{r.descricao}</span>},
+                        {key:"descricao",label:"Descrição",render:r=><Desc t={r.descricao} n={r.grupoTotal}/>},
                         {key:"destino",label:"Destino",render:r=><B>{r.destino}</B>},
                         {key:"valor",label:"Valor",align:"right",render:r=><span className="font-mono">{fmt(r.valor)}</span>},
                         {key:"vencimento",label:"Vencimento",render:r=><span className="text-zinc-500">{r.vencimento}</span>},
@@ -525,7 +573,7 @@ export default function FinancasDashboard() {
                 {/* INVESTIMENTOS */}
                 <section><SH title="Investimentos" onAdd={()=>{setEditingInvest(null);setModalInvest(true);}} filters={iFD} activeFilters={iFilters} onFilterChange={(k,v)=>setIFilters(p=>({...p,[k]:v}))}/><MT a={iM} o={setIM}/>
                     <div className="mt-3"><Tbl cols={[
-                        {key:"produto",label:"Produto",render:r=><span className="font-mono font-semibold text-zinc-900">{r.produto}</span>},
+                        {key:"produto",label:"Produto",render:r=><span className="font-mono font-semibold text-zinc-900 inline-flex items-center gap-1.5">{r.produto}<GI n={r.grupoTotal}/></span>},
                         {key:"empresa",label:"Empresa",render:r=><span className="text-zinc-600">{r.empresa}</span>},
                         {key:"valor",label:"Valor",align:"right",render:r=><span className="font-mono">{fmt(r.valor)}</span>},
                         {key:"quantidade",label:"Qtd",align:"right"},
@@ -596,6 +644,7 @@ export default function FinancasDashboard() {
                             <div className="space-y-1.5">
                                 <div className="flex justify-between text-xs"><span className="text-zinc-400">Limite Anual</span><span className="font-mono text-zinc-600">{fmt(f.lim)}</span></div>
                                 <div className="flex justify-between text-xs"><span className="text-red-500">Despesa Anual</span><span className="font-mono text-red-500">{fmt(f.desp)}</span></div>
+                                {f.parcelavel&&<div className="pt-1"><B>Parcelável</B></div>}
                             </div>
                         </div>)}
                     </div>
@@ -603,7 +652,7 @@ export default function FinancasDashboard() {
             </div>
 
             <DespesaVariavelModal key={editingDV?`edit-${editingDV.id}`:copyDV?"copy":"new"} open={modal} onClose={closeAll} onSubmit={submitDV} loading={loading}
-                categorias={configCategorias} formas={configFormas}
+                categorias={configCategorias} formas={configFormas} formasParcelaveis={configFormasParcelaveis}
                 initialData={editingDV?{descricao:editingDV.descricao,categoria:editingDV.categoria,valor:String(editingDV.valor),data:editingDV.data,forma:editingDV.forma,balanco:editingDV.balanco,parcelas:"1",dataLimite:""}:undefined}
                 copyData={copyDV??undefined}
                 onDelete={editingDV?requestDeleteDV:undefined}
@@ -614,7 +663,7 @@ export default function FinancasDashboard() {
                 onDelete={editingGanho?requestDeleteGanho:undefined}/>
             <DespesaFixaModal open={modalFixa} onClose={closeAll} onSubmit={submitFixa} loading={loading}
                 categorias={configCategorias} formas={configFormas}
-                initialData={editingFixa?{descricao:editingFixa.descricao,categoria:editingFixa.categoria,valor:String(editingFixa.valor),vencimento:editingFixa.vencimento,status:editingFixa.status,dataPgto:editingFixa.dataPgto,forma:editingFixa.forma}:undefined}
+                initialData={editingFixa?{descricao:editingFixa.descricao,categoria:editingFixa.categoria,valor:String(editingFixa.valor),vencimento:editingFixa.vencimento,status:editingFixa.status,dataPgto:editingFixa.dataPgto,forma:editingFixa.forma,dataLimite:""}:undefined}
                 onDelete={editingFixa?requestDeleteFixa:undefined}/>
             <DividaModal open={modalDivida} onClose={closeAll} onSubmit={submitDivida} loading={loading}
                 initialData={editingDivida?{descricao:editingDivida.descricao,destino:editingDivida.destino,valor:String(editingDivida.valor),vencimento:editingDivida.vencimento,status:editingDivida.status,dataLimite:""}:undefined}
@@ -637,9 +686,34 @@ export default function FinancasDashboard() {
                 initialData={editingCategoria?{nome:editingCategoria.nome,icone:editingCategoria.icone||"ShoppingBag",valor:editingCategoria.lim!=null?String(editingCategoria.lim):""}:undefined}
                 onDelete={editingCategoria?requestDeleteCategoria:undefined}/>
             <ConfigModal open={modalForma} onClose={closeAll} onSubmit={submitForma} loading={loading}
-                title="Forma de Pagamento" valorLabel="Limite Anual (R$)" valorPlaceholder="0,00" defaultIcon="CreditCard"
-                initialData={editingForma?{nome:editingForma.nome,icone:editingForma.icone||"CreditCard",valor:String(editingForma.lim||"")}:undefined}
+                title="Forma de Pagamento" valorLabel="Limite Anual (R$)" valorPlaceholder="0,00" defaultIcon="CreditCard" showParcelavel
+                initialData={editingForma?{nome:editingForma.nome,icone:editingForma.icone||"CreditCard",valor:String(editingForma.lim||""),parcelavel:editingForma.parcelavel}:undefined}
                 onDelete={editingForma?requestDeleteForma:undefined}/>
+
+            {/* MODAL DE CONFIRMAÇÃO DE EDIÇÃO EM GRUPO */}
+            {updateConfirm && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ animation: "fi .15s ease" }}>
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !loading && setUpdateConfirm(null)} />
+                    <div className="relative bg-white rounded-xl shadow-2xl border border-zinc-200 w-full max-w-sm mx-4 p-6" style={{ animation: "si .2s ease" }}>
+                        <h3 className="text-base font-semibold text-zinc-900">Salvar alterações?</h3>
+                        <p className="text-sm text-zinc-500 mt-2">
+                            Este lançamento faz parte de um grupo de <span className="font-semibold text-zinc-700">{updateConfirm.grupoTotal} registros vinculados</span>. As alterações podem ser aplicadas a todos — datas permanecem individuais de cada mês.
+                        </p>
+                        <div className="flex flex-col gap-2 mt-6">
+                            <button onClick={() => updateConfirm.action("registro")} disabled={loading} className="h-9 px-4 rounded-md border border-zinc-200 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors disabled:opacity-50">
+                                Salvar somente este
+                            </button>
+                            <button onClick={() => updateConfirm.action("grupo")} disabled={loading} className="h-9 px-4 rounded-md bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                                {loading ? <><Spinner className="size-4" /> Salvando...</> : `Salvar nos ${updateConfirm.grupoTotal} vinculados`}
+                            </button>
+                            <button onClick={() => setUpdateConfirm(null)} disabled={loading} className="h-9 px-4 rounded-md text-sm font-medium text-zinc-500 hover:bg-zinc-50 transition-colors disabled:opacity-50">
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                    <style>{`@keyframes fi{from{opacity:0}to{opacity:1}}@keyframes si{from{opacity:0;transform:scale(.96) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}`}</style>
+                </div>
+            )}
 
             {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO */}
             {deleteConfirm && (
@@ -647,15 +721,36 @@ export default function FinancasDashboard() {
                     <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !deleting && setDeleteConfirm(null)} />
                     <div className="relative bg-white rounded-xl shadow-2xl border border-zinc-200 w-full max-w-sm mx-4 p-6" style={{ animation: "si .2s ease" }}>
                         <h3 className="text-base font-semibold text-zinc-900">Excluir registro?</h3>
-                        <p className="text-sm text-zinc-500 mt-2">Essa ação não pode ser desfeita. {deleteConfirm.message ?? "O registro será removido permanentemente."}</p>
-                        <div className="flex justify-end gap-3 mt-6">
-                            <button onClick={() => setDeleteConfirm(null)} disabled={deleting} className="h-9 px-4 rounded-md border border-zinc-200 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors disabled:opacity-50">
-                                Cancelar
-                            </button>
-                            <button onClick={deleteConfirm.action} disabled={deleting} className="h-9 px-4 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center gap-2">
-                                {deleting ? <><Spinner className="size-4" /> Excluindo...</> : "Excluir"}
-                            </button>
-                        </div>
+                        {(deleteConfirm.grupoTotal ?? 1) > 1 ? (
+                            <>
+                                <p className="text-sm text-zinc-500 mt-2">
+                                    Este lançamento faz parte de um grupo de <span className="font-semibold text-zinc-700">{deleteConfirm.grupoTotal} registros vinculados</span> (recorrência, parcelamento ou assinatura). Essa ação não pode ser desfeita.
+                                </p>
+                                <div className="flex flex-col gap-2 mt-6">
+                                    <button onClick={() => deleteConfirm.action("registro")} disabled={deleting} className="h-9 px-4 rounded-md border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 transition-colors disabled:opacity-50">
+                                        Excluir somente este
+                                    </button>
+                                    <button onClick={() => deleteConfirm.action("grupo")} disabled={deleting} className="h-9 px-4 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                                        {deleting ? <><Spinner className="size-4" /> Excluindo...</> : `Excluir os ${deleteConfirm.grupoTotal} vinculados`}
+                                    </button>
+                                    <button onClick={() => setDeleteConfirm(null)} disabled={deleting} className="h-9 px-4 rounded-md text-sm font-medium text-zinc-500 hover:bg-zinc-50 transition-colors disabled:opacity-50">
+                                        Cancelar
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-sm text-zinc-500 mt-2">Essa ação não pode ser desfeita. {deleteConfirm.message ?? "O registro será removido permanentemente."}</p>
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button onClick={() => setDeleteConfirm(null)} disabled={deleting} className="h-9 px-4 rounded-md border border-zinc-200 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors disabled:opacity-50">
+                                        Cancelar
+                                    </button>
+                                    <button onClick={() => deleteConfirm.action()} disabled={deleting} className="h-9 px-4 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center gap-2">
+                                        {deleting ? <><Spinner className="size-4" /> Excluindo...</> : "Excluir"}
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
                     <style>{`@keyframes fi{from{opacity:0}to{opacity:1}}@keyframes si{from{opacity:0;transform:scale(.96) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}`}</style>
                 </div>

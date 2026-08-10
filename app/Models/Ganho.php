@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Ganho extends Model
 {
-    protected $fillable = ['descricao', 'fonte', 'data', 'valor'];
+    protected $fillable = ['descricao', 'fonte', 'data', 'valor', 'grupo_id'];
 
     /** @var array<string, string> */
     protected $casts = [

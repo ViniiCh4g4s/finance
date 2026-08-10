@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Concerns\HandlesGroupedRecords;
 use Carbon\Carbon;
 use Illuminate\Http\{RedirectResponse, Request};
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class GanhoController extends Controller
 {
+    use HandlesGroupedRecords;
+
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -33,7 +37,8 @@ class GanhoController extends Controller
         }
 
         if ($dataLimite && $dataLimite->gte($dataGanho->copy()->startOfMonth())) {
-            $current = $dataGanho->copy();
+            $data['grupo_id'] = (string) Str::uuid();
+            $current          = $dataGanho->copy();
             while ($current->copy()->startOfMonth()->lte($dataLimite)) {
                 $rec         = $data;
                 $rec['data'] = $current->toDateString();
@@ -49,8 +54,6 @@ class GanhoController extends Controller
 
     public function update(Request $request, int $id): RedirectResponse
     {
-        $ganho = $request->user()->ganhos()->findOrFail($id);
-
         $data = $request->validate([
             'descricao' => 'required|string|max:255',
             'fonte'     => 'required|string|max:255',
@@ -60,14 +63,14 @@ class GanhoController extends Controller
 
         $data['data'] = Carbon::createFromFormat('d/m/Y', $data['data'])->toDateString();
 
-        $ganho->update($data);
+        $this->updateWithScope($request, $request->user()->ganhos(), $id, $data, ['descricao', 'fonte', 'valor']);
 
         return back();
     }
 
     public function destroy(Request $request, int $id): RedirectResponse
     {
-        $request->user()->ganhos()->findOrFail($id)->delete();
+        $this->destroyWithScope($request, $request->user()->ganhos(), $id);
 
         return back();
     }

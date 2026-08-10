@@ -12,6 +12,7 @@ class FormaPagamentoController extends Controller
             'nome'         => 'required|string|max:255',
             'icone'        => 'nullable|string|max:255',
             'limite_anual' => 'nullable|numeric|min:0',
+            'parcelavel'   => 'boolean',
         ]);
 
         $request->user()->formasPagamento()->create($data);
@@ -27,6 +28,7 @@ class FormaPagamentoController extends Controller
             'nome'         => 'required|string|max:255',
             'icone'        => 'nullable|string|max:255',
             'limite_anual' => 'nullable|numeric|min:0',
+            'parcelavel'   => 'boolean',
         ]);
 
         $record->update($data);

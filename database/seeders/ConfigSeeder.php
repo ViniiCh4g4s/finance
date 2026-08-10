@@ -46,7 +46,7 @@ class ConfigSeeder extends Seeder
             ['nome' => 'Dinheiro', 'icone' => 'Banknote', 'limite_anual' => 6000],
             ['nome' => 'Boleto', 'icone' => 'FileText', 'limite_anual' => 12000],
             ['nome' => 'Pix', 'icone' => 'Zap', 'limite_anual' => 24000],
-            ['nome' => 'Cartão de Crédito', 'icone' => 'CreditCard', 'limite_anual' => 36000],
+            ['nome' => 'Cartão de Crédito', 'icone' => 'CreditCard', 'limite_anual' => 36000, 'parcelavel' => true],
             ['nome' => 'Cartão de Débito', 'icone' => 'CreditCard', 'limite_anual' => 18000],
         ]);
     }

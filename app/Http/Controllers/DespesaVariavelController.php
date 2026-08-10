@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Concerns\HandlesGroupedRecords;
 use Carbon\Carbon;
 use Illuminate\Http\{RedirectResponse, Request};
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class DespesaVariavelController extends Controller
 {
+    use HandlesGroupedRecords;
+
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -39,9 +43,10 @@ class DespesaVariavelController extends Controller
         if ($dataLimite && $dataLimite->gte($balancoDate)) {
             // Assinatura: criar mesmo registro em cada mês até data limite,
             // avançando a data de cobrança junto com o balanço
-            $dataBase = Carbon::parse($data['data']);
-            $current  = $balancoDate->copy();
-            $offset   = 0;
+            $data['grupo_id'] = (string) Str::uuid();
+            $dataBase         = Carbon::parse($data['data']);
+            $current          = $balancoDate->copy();
+            $offset           = 0;
             while ($current->lte($dataLimite)) {
                 $rec            = $data;
                 $rec['balanco'] = $current->toDateString();
@@ -54,9 +59,10 @@ class DespesaVariavelController extends Controller
             $data['balanco'] = $balancoDate->toDateString();
             $request->user()->despesasVariaveis()->create($data);
         } else {
-            $total        = (float) $data['valor'];
-            $valorParcela = round($total / $parcelas, 2);
-            $descOriginal = $data['descricao'];
+            $total            = (float) $data['valor'];
+            $valorParcela     = round($total / $parcelas, 2);
+            $descOriginal     = $data['descricao'];
+            $data['grupo_id'] = (string) Str::uuid();
 
             for ($i = 0; $i < $parcelas; $i++) {
                 $parcelaData              = $data;
@@ -78,8 +84,6 @@ class DespesaVariavelController extends Controller
 
     public function update(Request $request, int $id): RedirectResponse
     {
-        $record = $request->user()->despesasVariaveis()->findOrFail($id);
-
         $data = $request->validate([
             'descricao' => 'required|string|max:255',
             'categoria' => 'required|string|max:255',
@@ -92,14 +96,14 @@ class DespesaVariavelController extends Controller
         $data['data']    = Carbon::createFromFormat('d/m/Y', $data['data'])->toDateString();
         $data['balanco'] = Carbon::createFromFormat('m/Y', $data['balanco'])->startOfMonth()->toDateString();
 
-        $record->update($data);
+        $this->updateWithScope($request, $request->user()->despesasVariaveis(), $id, $data, ['descricao', 'categoria', 'valor', 'forma']);
 
         return back();
     }
 
     public function destroy(Request $request, int $id): RedirectResponse
     {
-        $request->user()->despesasVariaveis()->findOrFail($id)->delete();
+        $this->destroyWithScope($request, $request->user()->despesasVariaveis(), $id);
 
         return back();
     }

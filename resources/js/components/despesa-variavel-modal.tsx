@@ -30,6 +30,7 @@ interface Props {
     onCopy?: () => void;
     categorias?: string[];
     formas?: string[];
+    formasParcelaveis?: string[];
     loading?: boolean;
 }
 
@@ -77,7 +78,7 @@ function dateToBalanco(d: Date | undefined): string {
     return `${mm}/${d.getFullYear()}`;
 }
 
-export default function DespesaVariavelModal({ open, onClose, onSubmit, initialData, copyData, onDelete, onCopy, categorias, formas, loading }: Props) {
+export default function DespesaVariavelModal({ open, onClose, onSubmit, initialData, copyData, onDelete, onCopy, categorias, formas, formasParcelaveis, loading }: Props) {
     const [form, setForm] = useState<DespesaFormData>(empty);
     const sf = (k: keyof DespesaFormData, v: string) => setForm(p => ({ ...p, [k]: v }));
     const editing = !!initialData;
@@ -85,9 +86,12 @@ export default function DespesaVariavelModal({ open, onClose, onSubmit, initialD
     const [popBalanco, setPopBalanco] = useState(false);
     const [popDataLimite, setPopDataLimite] = useState(false);
 
-    const isCredito = form.forma.toLowerCase().includes("crédito");
+    // Formas parceláveis vêm do banco; sem a lista, cai no comportamento antigo (nome com "crédito")
+    const isParcelavel = formasParcelaveis
+        ? formasParcelaveis.includes(form.forma)
+        : form.forma.toLowerCase().includes("crédito");
     const isAssinatura = form.categoria.toLowerCase().includes("assinatura");
-    const showParcelas = isCredito && !editing && !isAssinatura;
+    const showParcelas = isParcelavel && !editing && !isAssinatura;
     const showDataLimite = isAssinatura && !editing;
 
     useEffect(() => {
@@ -107,9 +111,9 @@ export default function DespesaVariavelModal({ open, onClose, onSubmit, initialD
         }
     }, [form.data]);
 
-    // Reset parcelas when forma changes away from crédito
+    // Reset parcelas when forma changes to one that does not allow installments
     useEffect(() => {
-        if (!isCredito) {
+        if (!isParcelavel) {
             sf("parcelas", "1");
         }
     }, [form.forma]);

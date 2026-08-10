@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Divida extends Model
 {
-    protected $fillable = ['descricao', 'destino', 'valor', 'vencimento', 'status'];
+    protected $fillable = ['descricao', 'destino', 'valor', 'vencimento', 'status', 'grupo_id'];
 
     /** @var array<string, string> */
     protected $casts = [

@@ -9,11 +9,12 @@ class FormaPagamento extends Model
 {
     protected $table = 'formas_pagamento';
 
-    protected $fillable = ['nome', 'icone', 'limite_anual'];
+    protected $fillable = ['nome', 'icone', 'limite_anual', 'parcelavel'];
 
     /** @var array<string, string> */
     protected $casts = [
         'limite_anual' => 'decimal:2',
+        'parcelavel'   => 'boolean',
     ];
 
     /** @return BelongsTo<User, $this> */
