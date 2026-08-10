@@ -9,7 +9,7 @@ class DespesaVariavel extends Model
 {
     protected $table = 'despesas_variaveis';
 
-    protected $fillable = ['descricao', 'categoria', 'valor', 'data', 'forma', 'balanco'];
+    protected $fillable = ['descricao', 'categoria', 'valor', 'data', 'forma', 'balanco', 'grupo_id'];
 
     /** @var array<string, string> */
     protected $casts = [

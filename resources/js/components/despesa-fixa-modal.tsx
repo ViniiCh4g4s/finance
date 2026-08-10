@@ -17,6 +17,7 @@ export interface DespesaFixaFormData {
     status: string;
     dataPgto: string;
     forma: string;
+    dataLimite: string;
 }
 
 interface Props {
@@ -33,8 +34,9 @@ interface Props {
 const CATEGORIAS_DEFAULT = ["Casa", "Assinaturas", "Transporte", "Farmácia e Saúde", "Mercado", "Alimentação", "Entretenimento", "Shopping", "Utilidades", "Outros"];
 const FORMAS_DEFAULT = ["Pix", "Boleto", "Dinheiro", "Cartão de Débito", "Cartão de Crédito Itaú", "Cartão de Crédito Nubank", "Cartão de Crédito Nubank PJ"];
 const STATUS = ["Pago", "Pendente"];
+const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
-const empty: DespesaFixaFormData = { descricao: "", categoria: "", valor: "", vencimento: "", status: "", dataPgto: "", forma: "" };
+const empty: DespesaFixaFormData = { descricao: "", categoria: "", valor: "", vencimento: "", status: "", dataPgto: "", forma: "", dataLimite: "" };
 
 const inputCls = "w-full h-9 px-3 rounded-md border border-zinc-200 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-950/10 focus:border-zinc-400 bg-white";
 
@@ -45,18 +47,41 @@ const toDate = (s: string): Date | undefined => {
 };
 const toStr = (d: Date | undefined): string => d ? format(d, "dd/MM/yyyy") : "";
 
+const balancoToDate = (value: string): Date | undefined => {
+    if (!value) return undefined;
+    const d = parse(value, "MM/yyyy", new Date());
+    return isValid(d) ? d : undefined;
+};
+const dateToBalanco = (d: Date | undefined): string => {
+    if (!d) return "";
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    return `${mm}/${d.getFullYear()}`;
+};
+const balancoLabel = (value: string): string => {
+    if (!value) return "";
+    const [mm, yyyy] = value.split("/");
+    const idx = parseInt(mm, 10) - 1;
+    return idx >= 0 && idx <= 11 ? `${MESES[idx]} ${yyyy}` : value;
+};
+
 export default function DespesaFixaModal({ open, onClose, onSubmit, initialData, onDelete, categorias, formas, loading }: Props) {
     const [form, setForm] = useState<DespesaFixaFormData>(empty);
     const sf = (k: keyof DespesaFixaFormData, v: string) => setForm(p => ({ ...p, [k]: v }));
     const editing = !!initialData;
     const [popVenc, setPopVenc] = useState(false);
     const [popPgto, setPopPgto] = useState(false);
+    const [popLimite, setPopLimite] = useState(false);
+    const [recorrente, setRecorrente] = useState(false);
 
     useEffect(() => {
-        if (open) setForm(initialData ?? empty);
+        if (open) { setForm(initialData ?? empty); setRecorrente(false); }
     }, [open]);
 
-    const handleClose = () => { if (loading) return; setForm(empty); onClose(); };
+    useEffect(() => {
+        if (!recorrente) sf("dataLimite", "");
+    }, [recorrente]);
+
+    const handleClose = () => { if (loading) return; setForm(empty); setRecorrente(false); onClose(); };
 
     const handleSubmit = () => {
         if (!form.descricao || !form.valor || !form.vencimento) return;
@@ -168,6 +193,35 @@ export default function DespesaFixaModal({ open, onClose, onSubmit, initialData,
                             </Combobox>
                         </div>
                     </div>
+                    {!editing && recorrente && (
+                        <div className="space-y-1.5">
+                            <label className="block text-sm font-medium text-zinc-700">Repetir até</label>
+                            <Popover open={popLimite} onOpenChange={setPopLimite}>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" data-empty={!form.dataLimite} className="w-full h-9 justify-between text-left font-normal text-sm data-[empty=true]:text-muted-foreground">
+                                        {form.dataLimite ? balancoLabel(form.dataLimite) : <span>Selecione o mês...</span>}
+                                        <ChevronDownIcon className="size-4 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                        mode="single"
+                                        selected={balancoToDate(form.dataLimite)}
+                                        onSelect={d => { sf("dataLimite", dateToBalanco(d)); setPopLimite(false); }}
+                                        defaultMonth={balancoToDate(form.dataLimite) ?? toDate(form.vencimento)}
+                                        locale={ptBR}
+                                        captionLayout="dropdown"
+                                    />
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                    )}
+                    {!editing && (
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" checked={recorrente} onChange={e => setRecorrente(e.target.checked)} className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-950/10" />
+                            <span className="text-sm text-zinc-600">Recorrente (repetir mensalmente)</span>
+                        </label>
+                    )}
                     <div className="pt-1 flex gap-3">
                         {editing && onDelete && (
                             <button type="button" onClick={onDelete} disabled={loading} className="h-10 px-4 rounded-md border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 active:bg-red-100 transition-colors disabled:opacity-50">

@@ -9,7 +9,7 @@ class DespesaFixa extends Model
 {
     protected $table = 'despesas_fixas';
 
-    protected $fillable = ['descricao', 'categoria', 'valor', 'vencimento', 'status', 'data_pgto', 'forma'];
+    protected $fillable = ['descricao', 'categoria', 'valor', 'vencimento', 'status', 'data_pgto', 'forma', 'grupo_id'];
 
     /** @var array<string, string> */
     protected $casts = [

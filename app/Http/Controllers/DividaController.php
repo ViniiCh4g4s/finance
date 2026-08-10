@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Concerns\HandlesGroupedRecords;
 use Carbon\Carbon;
 use Illuminate\Http\{RedirectResponse, Request};
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class DividaController extends Controller
 {
+    use HandlesGroupedRecords;
+
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -34,7 +38,8 @@ class DividaController extends Controller
         }
 
         if ($dataLimite && $dataLimite->gte($vencimento->copy()->startOfMonth())) {
-            $current = $vencimento->copy();
+            $data['grupo_id'] = (string) Str::uuid();
+            $current          = $vencimento->copy();
             while ($current->copy()->startOfMonth()->lte($dataLimite)) {
                 $rec               = $data;
                 $rec['vencimento'] = $current->toDateString();
@@ -50,8 +55,6 @@ class DividaController extends Controller
 
     public function update(Request $request, int $id): RedirectResponse
     {
-        $record = $request->user()->dividas()->findOrFail($id);
-
         $data = $request->validate([
             'descricao'  => 'required|string|max:255',
             'destino'    => 'required|string|max:255',
@@ -62,14 +65,14 @@ class DividaController extends Controller
 
         $data['vencimento'] = Carbon::createFromFormat('d/m/Y', $data['vencimento'])->toDateString();
 
-        $record->update($data);
+        $this->updateWithScope($request, $request->user()->dividas(), $id, $data, ['descricao', 'destino', 'valor', 'status']);
 
         return back();
     }
 
     public function destroy(Request $request, int $id): RedirectResponse
     {
-        $request->user()->dividas()->findOrFail($id)->delete();
+        $this->destroyWithScope($request, $request->user()->dividas(), $id);
 
         return back();
     }

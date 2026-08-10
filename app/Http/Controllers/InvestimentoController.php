@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Concerns\HandlesGroupedRecords;
 use Carbon\Carbon;
 use Illuminate\Http\{RedirectResponse, Request};
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class InvestimentoController extends Controller
 {
+    use HandlesGroupedRecords;
+
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -44,7 +48,8 @@ class InvestimentoController extends Controller
         }
 
         if ($dataLimite && $dataLimite->gte($dataInvest->copy()->startOfMonth())) {
-            $current = $dataInvest->copy();
+            $base['grupo_id'] = (string) Str::uuid();
+            $current          = $dataInvest->copy();
             while ($current->copy()->startOfMonth()->lte($dataLimite)) {
                 $rec         = $base;
                 $rec['data'] = $current->toDateString();
@@ -61,8 +66,6 @@ class InvestimentoController extends Controller
 
     public function update(Request $request, int $id): RedirectResponse
     {
-        $record = $request->user()->investimentos()->findOrFail($id);
-
         $data = $request->validate([
             'produto'    => 'required|string|max:255',
             'empresa'    => 'required|string|max:255',
@@ -74,7 +77,7 @@ class InvestimentoController extends Controller
             'data'       => 'required|string|date_format:d/m/Y',
         ]);
 
-        $record->update([
+        $this->updateWithScope($request, $request->user()->investimentos(), $id, [
             'produto'    => $data['produto'],
             'empresa'    => $data['empresa'],
             'valor'      => $data['valor'],
@@ -83,14 +86,14 @@ class InvestimentoController extends Controller
             'provento'   => $data['provento'] ?? 0,
             'frequencia' => $data['frequencia'],
             'data'       => Carbon::createFromFormat('d/m/Y', $data['data'])->toDateString(),
-        ]);
+        ], ['produto', 'empresa', 'valor', 'quantidade', 'tipo_ativo', 'provento', 'frequencia']);
 
         return back();
     }
 
     public function destroy(Request $request, int $id): RedirectResponse
     {
-        $request->user()->investimentos()->findOrFail($id)->delete();
+        $this->destroyWithScope($request, $request->user()->investimentos(), $id);
 
         return back();
     }

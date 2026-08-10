@@ -3,11 +3,32 @@
 namespace App\Http\Controllers;
 
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Inertia\{Inertia, Response};
 
 class HomeController extends Controller
 {
+    /**
+     * Quantos lançamentos existem em cada grupo (recorrência, parcelamento ou
+     * assinatura), sem filtrar por ano — o grupo pode atravessar anos.
+     *
+     * @template TModel of Model
+     *
+     * @param  HasMany<TModel, \App\Models\User>  $relation
+     * @return Collection<string, int>
+     */
+    private function totaisPorGrupo(HasMany $relation): Collection
+    {
+        return $relation->whereNotNull('grupo_id')
+            ->selectRaw('grupo_id, count(*) as total')
+            ->groupBy('grupo_id')
+            ->pluck('total', 'grupo_id')
+            ->map(fn ($total) => (int) $total);
+    }
+
     public function index(Request $request): Response
     {
         if (!$request->user()) {
@@ -90,16 +111,25 @@ class HomeController extends Controller
 
         $fmtDate = fn ($d) => $d ? Carbon::parse($d)->format('d/m/Y') : '';
 
+        // Tamanho de cada grupo de lançamentos vinculados, contando todos os anos
+        $totGanhos    = $this->totaisPorGrupo($user->ganhos());
+        $totFixas     = $this->totaisPorGrupo($user->despesasFixas());
+        $totVariaveis = $this->totaisPorGrupo($user->despesasVariaveis());
+        $totDividas   = $this->totaisPorGrupo($user->dividas());
+        $totInvest    = $this->totaisPorGrupo($user->investimentos());
+
         return Inertia::render('home', [
             'ano'           => $ano,
             'balancoMensal' => $balancoMensal,
             'ganhos'        => $ganhos->map(fn ($g) => [
-                'id'        => $g->id,
-                'descricao' => $g->descricao,
-                'fonte'     => $g->fonte,
-                'data'      => $fmtDate($g->data),
-                'valor'     => (float) $g->valor,
-                'balanco'   => $meses[$g->data->month - 1],
+                'id'         => $g->id,
+                'descricao'  => $g->descricao,
+                'fonte'      => $g->fonte,
+                'data'       => $fmtDate($g->data),
+                'valor'      => (float) $g->valor,
+                'balanco'    => $meses[$g->data->month - 1],
+                'grupoId'    => $g->grupo_id,
+                'grupoTotal' => $totGanhos[$g->grupo_id] ?? 1,
             ])->values(),
             'fixas' => $fixas->map(fn ($d) => [
                 'id'         => $d->id,
@@ -111,15 +141,19 @@ class HomeController extends Controller
                 'dataPgto'   => $fmtDate($d->data_pgto),
                 'forma'      => $d->forma ?? '',
                 'balanco'    => $meses[($d->data_pgto ?? $d->vencimento)->month - 1],
+                'grupoId'    => $d->grupo_id,
+                'grupoTotal' => $totFixas[$d->grupo_id] ?? 1,
             ])->values(),
             'variaveis' => $variaveis->map(fn ($d) => [
-                'id'        => $d->id,
-                'descricao' => $d->descricao,
-                'categoria' => $d->categoria,
-                'valor'     => (float) $d->valor,
-                'data'      => $fmtDate($d->data),
-                'forma'     => $d->forma ?? '',
-                'balanco'   => $d->balanco->format('m/Y'),
+                'id'         => $d->id,
+                'descricao'  => $d->descricao,
+                'categoria'  => $d->categoria,
+                'valor'      => (float) $d->valor,
+                'data'       => $fmtDate($d->data),
+                'forma'      => $d->forma ?? '',
+                'balanco'    => $d->balanco->format('m/Y'),
+                'grupoId'    => $d->grupo_id,
+                'grupoTotal' => $totVariaveis[$d->grupo_id] ?? 1,
             ])->values(),
             'dividas' => $dividas->map(fn ($d) => [
                 'id'         => $d->id,
@@ -129,6 +163,8 @@ class HomeController extends Controller
                 'vencimento' => $fmtDate($d->vencimento),
                 'status'     => $d->status,
                 'balanco'    => $meses[$d->vencimento->month - 1],
+                'grupoId'    => $d->grupo_id,
+                'grupoTotal' => $totDividas[$d->grupo_id] ?? 1,
             ])->values(),
             'investimentos' => $investimentos->map(fn ($inv) => [
                 'id'         => $inv->id,
@@ -142,6 +178,8 @@ class HomeController extends Controller
                 'frequencia' => $inv->frequencia,
                 'data'       => $fmtDate($inv->data),
                 'balanco'    => $meses[$inv->data->month - 1],
+                'grupoId'    => $inv->grupo_id,
+                'grupoTotal' => $totInvest[$inv->grupo_id] ?? 1,
             ])->values(),
             'metas' => $metas->map(function ($m) use ($investimentos) {
                 $investido = round($investimentos

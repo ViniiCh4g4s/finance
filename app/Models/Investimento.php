@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Investimento extends Model
 {
-    protected $fillable = ['produto', 'empresa', 'valor', 'quantidade', 'tipo_ativo', 'provento', 'frequencia', 'data'];
+    protected $fillable = ['produto', 'empresa', 'valor', 'quantidade', 'tipo_ativo', 'provento', 'frequencia', 'data', 'grupo_id'];
 
     /** @var array<string, string> */
     protected $casts = [

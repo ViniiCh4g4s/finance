@@ -191,3 +191,83 @@ test('bulk destroy deletes selected despesas fixas and ignores other users recor
     $this->assertDatabaseMissing('despesas_fixas', ['id' => $d2->id]);
     $this->assertDatabaseHas('despesas_fixas', ['id' => $alheio->id]);
 });
+
+test('store with recurrence creates monthly despesas fixas sharing a grupo', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->post(route('despesas-fixas.store'), [
+            'descricao'  => 'Aluguel',
+            'categoria'  => 'Casa',
+            'valor'      => 2000,
+            'vencimento' => '10/01/2026',
+            'status'     => 'Pendente',
+            'forma'      => 'Boleto',
+            'dataLimite' => '05/2026',
+        ])
+        ->assertRedirect();
+
+    $despesas = $user->despesasFixas()->orderBy('vencimento')->get();
+
+    expect($despesas)->toHaveCount(5);
+    expect($despesas[0]->vencimento->format('Y-m-d'))->toBe('2026-01-10');
+    expect($despesas[4]->vencimento->format('Y-m-d'))->toBe('2026-05-10');
+    expect($despesas->pluck('grupo_id')->unique())->toHaveCount(1);
+    expect($despesas[0]->grupo_id)->not->toBeNull();
+});
+
+test('recurrence advances data de pagamento together with vencimento', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->post(route('despesas-fixas.store'), [
+            'descricao'  => 'Internet',
+            'categoria'  => 'Casa',
+            'valor'      => 120,
+            'vencimento' => '15/01/2026',
+            'status'     => 'Pago',
+            'dataPgto'   => '14/01/2026',
+            'dataLimite' => '03/2026',
+        ])
+        ->assertRedirect();
+
+    $despesas = $user->despesasFixas()->orderBy('vencimento')->get();
+
+    expect($despesas)->toHaveCount(3);
+    expect($despesas[1]->data_pgto->format('Y-m-d'))->toBe('2026-02-14');
+    expect($despesas[2]->data_pgto->format('Y-m-d'))->toBe('2026-03-14');
+});
+
+test('store without dataLimite creates a single despesa fixa without grupo', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->post(route('despesas-fixas.store'), [
+            'descricao'  => 'Aluguel',
+            'categoria'  => 'Casa',
+            'valor'      => 2000,
+            'vencimento' => '10/01/2026',
+            'status'     => 'Pendente',
+        ])
+        ->assertRedirect();
+
+    expect($user->despesasFixas()->count())->toBe(1);
+    expect($user->despesasFixas()->first()->grupo_id)->toBeNull();
+});
+
+test('store rejects recurrence beyond 60 months', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->post(route('despesas-fixas.store'), [
+            'descricao'  => 'Aluguel',
+            'categoria'  => 'Casa',
+            'valor'      => 2000,
+            'vencimento' => '10/01/2026',
+            'status'     => 'Pendente',
+            'dataLimite' => '01/2099',
+        ])
+        ->assertSessionHasErrors(['dataLimite']);
+
+    expect($user->despesasFixas()->count())->toBe(0);
+});
